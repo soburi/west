@@ -5,6 +5,19 @@
 
 '''West project commands'''
 
+import requests
+import os
+import json
+import sys
+import platform
+import re
+import tempfile
+import tarfile
+import subprocess
+import shutil
+import py7zr
+
+
 import argparse
 from functools import partial
 import logging
@@ -1913,6 +1926,235 @@ class SelfUpdate(_ProjectCommand):
 
     def do_run(self, args, user_args):
         self.die(self.description)
+
+
+GITHUB_API_URL = "https://api.github.com/repos/zephyrproject-rtos/sdk-ng/releases"
+
+
+class Sdk(_ProjectCommand):
+    def __init__(self):
+        super().__init__(
+            "sdk",
+            "deprecated; exists for backwards compatibility",
+            "Do not use. You can upgrade west with pip only from v0.6.0.",
+            requires_workspace=False,
+        )
+
+    def do_add_parser(self, parser_adder):
+        parser = self._parser(parser_adder, epilog=GREP_EPILOG)
+        parser.add_argument(
+            "--install", default=None, dest="sdk_version", help="install SDK version"
+        ),
+        parser.add_argument(
+            "--hosttools", action="store_true", help="install hosttools"
+        ),
+        parser.add_argument(
+            "--cmake-pkg", action="store_true", help="register CMake package"
+        ),
+        parser.add_argument(
+            "--install-base",
+            default=os.path.expanduser("~"),
+            help="install SDK version",
+        ),
+        parser.add_argument(
+            "--toolchains",
+            nargs="*",
+            default=[],
+            type=str,
+            help="a list of int variables",
+        )
+
+        return parser
+
+    def request_all_releases(self, url):
+        releases = []
+        page = 1
+        
+        while True:
+            params = {'page': page, 'per_page': 100}
+            response = requests.get(url, params=params)
+            if response.status_code != 200:
+                raise Exception(f"Failed to fetch releases: {response.status_code}, {response.text}")
+
+            data = response.json()
+            if not data:
+                break
+
+            releases.extend(data)
+            page += 1
+
+        return releases
+
+    def query_minimal_sdk_url(self, release):
+        system = platform.system()
+        machine = platform.machine()
+
+        if system == "Linux":
+            osname = "linux"
+        elif system == "Darwin":
+            osname = "macos"
+        elif system == "Windows":
+            osname = "windows"
+        else:
+            raise Exception(f"Unsupported system: {system}")
+
+        if machine == "aarch64" or machine == "x86_64":
+            arch = machine
+        else:
+            raise Exception(f"Unsupported machine: {machine}")
+
+        assets = release.get("assets", [])
+        version = re.sub("^v", "", release["tag_name"])
+
+        if osname == "windows":
+            name = "zephyr-sdk-" + version + "_" + osname + "-" + arch + "_minimal.7z"
+        else:
+            name = "zephyr-sdk-" + version + "_" + osname + "-" + arch + "_minimal.tar.xz"
+
+        minimal_sdk_asset = next(filter(lambda x: x["name"].startswith(name), assets))
+
+        return minimal_sdk_asset["browser_download_url"]
+
+    def download_and_extract(self, download_url, install_base, sdk_dir):
+        response = requests.get(download_url, stream=True)
+        if response.status_code != 200:
+            raise Exception(
+                f"Failed to download {download_url}: {response.status_code}"
+            )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            file = open(os.path.join(tempdir, re.sub(r'^.*/', '', download_url)), mode="wb")
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+            self.inf(f"Downloaded: {file.name}")
+            file.close()
+
+            if file.name.endswith(".tar.xz"):
+                with tarfile.open(file.name, mode="r:xz") as archive:
+                    archive.extractall(path=os.path.dirname(file.name))
+            else:
+                with py7zr.SevenZipFile(file.name, mode='r') as archive:
+                    archive.extractall(path=os.path.dirname(file.name))
+
+            if os.access(os.path.join(install_base), os.W_OK):
+                shutil.copytree(
+                    os.path.join(os.path.dirname(file.name), sdk_dir),
+                    os.path.join(install_base, sdk_dir),
+                )
+            else:
+                subprocess.run(
+                    [
+                        "sudo",
+                        sys.executable,
+                        "-c",
+                        'import shutil; shutil.copytree("{0}", "{1}")'.format(
+                            os.path.join(os.path.dirname(file.name), sdk_dir),
+                            os.path.join(install_base, sdk_dir),
+                        ),
+                    ]
+                )
+    
+    def install_sdk(self, args, user_args):
+        releases = self.request_all_releases(GITHUB_API_URL)
+
+        if args.sdk_version == "latest":
+            target_release = releases[0]
+        else:
+            target_release = next(
+                filter(lambda x: x["tag_name"] == ("v" + args.sdk_version), releases)
+            )
+
+        version = re.sub("^v", "", target_release["tag_name"])
+        sdk_dirname = "zephyr-sdk-" + version
+
+        target_dir = os.path.join(args.install_base, sdk_dirname)
+        setup_cmd = os.path.join(args.install_base, sdk_dirname, "setup.sh")
+
+        if not os.path.exists(target_dir):
+            download_url = self.query_minimal_sdk_url(target_release)
+            self.download_and_extract(download_url, args.install_base, sdk_dirname)
+
+        for tc in args.toolchains:
+            if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
+                subprocess.run([setup_cmd, "-t", tc])
+            else:
+                subprocess.run(["sudo", setup_cmd, "-t", tc])
+
+        if args.hosttools:
+            if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
+                subprocess.run([setup_cmd, "-h"])
+            else:
+                subprocess.run(["sudo", setup_cmd, "-h"])
+
+        if args.cmake_pkg:
+            subprocess.run([setup_cmd, "-c"])
+
+    def list_sdk(self, args, user_args):
+        searchpath = [
+            os.path.join("/usr"),
+            os.path.join("/usr", "local"),
+            os.path.join("/opt"),
+            os.path.join(os.environ.get("HOME")),
+            os.path.join(os.environ.get("HOME"), ".local"),
+            os.path.join(os.environ.get("HOME"), ".local", "opt"),
+            os.path.join(os.environ.get("HOME"), "bin"),
+        ]
+
+        sdk_list = []
+
+        for spath in searchpath:
+            if os.path.exists(spath):
+                candicates = [
+                    os.path.join(spath, f)
+                    for f in os.listdir(spath)
+                    if re.search(r"zephyr-sdk-\d+\.\d+\.\d+(-.*)?", f)
+                ]
+                sdk_list.extend(
+                    [
+                        d
+                        for d in candicates
+                        if os.path.exists(os.path.join(d, "sdk_version"))
+                    ]
+                )
+
+        self.inf(f"{os.path.basename(sdk_list[0])}:")
+        self.inf()
+        self.inf(f"  Path: {sdk_list[0]}")
+
+        with open(os.path.join(sdk_list[0], "sdk_toolchains")) as f:
+            toolchains = f.readlines()
+
+            self.inf()
+            self.inf("  Installed toolcains:")
+
+            for tc in toolchains:
+                if os.path.exists(os.path.join(sdk_list[0], tc.strip())):
+                    self.inf(f"    {tc.strip()}")
+
+            if os.path.exists(os.path.join(sdk_list[0], "sysroots")):
+                self.inf()
+                self.inf(f"  Hosttools installed:")
+
+            self.inf()
+
+            for root, dirs, files in os.walk(
+                os.path.join(os.environ.get("HOME"), ".cmake")
+            ):
+                for f in files:
+                    with open(os.path.join(root, f)) as file:
+                        if (
+                            file.readline()
+                            == os.path.join(sdk_list[0], "cmake").strip()
+                        ):
+                            self.inf("  Zephyr SDK CMake package registered:")
+                            self.inf()
+
+    def do_run(self, args, user_args):
+        if args.sdk_version:
+            self.install_sdk(args, user_args)
+        else:
+            self.list_sdk(args, user_args)
+
 
 #
 # Private helper routines.
