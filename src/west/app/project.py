@@ -6,7 +6,7 @@
 '''West project commands'''
 
 import argparse
-from functools import partial
+from functools import partial, cmp_to_key
 import hashlib
 import json
 import logging
@@ -1930,7 +1930,7 @@ class Sdk(_ProjectCommand):
     def __init__(self):
         super().__init__(
             "sdk",
-            "deprecated; exists for backwards compatibility",
+            "manage Zephyr SDK",
             "Do not use. You can upgrade west with pip only from v0.6.0.",
             requires_workspace=False,
         )
@@ -1938,10 +1938,10 @@ class Sdk(_ProjectCommand):
     def do_add_parser(self, parser_adder):
         parser = self._parser(parser_adder, epilog=GREP_EPILOG)
         parser.add_argument(
-            "--install", default=None, dest="sdk_version", help="install SDK version"
+            "--install", default=None, dest="sdk_version", help="install specified version of Zephyr SDK."
         ),
         parser.add_argument(
-            "--hosttools", action="store_true", help="install hosttools"
+            "--hosttools", action="store_true", help="install host-tools"
         ),
         parser.add_argument(
             "--cmake-pkg", action="store_true", help="register CMake package"
@@ -1949,14 +1949,14 @@ class Sdk(_ProjectCommand):
         parser.add_argument(
             "--install-base",
             default=os.path.expanduser("~"),
-            help="install SDK version",
+            help="install destination base",
         ),
         parser.add_argument(
             "--toolchains",
             nargs="*",
             default=[],
             type=str,
-            help="a list of int variables",
+            help="a list of install too",
         )
 
         return parser
@@ -2037,6 +2037,7 @@ class Sdk(_ProjectCommand):
             raise Exception(f"Failed to download {archive_url}: {resp.status_code}")
 
         with tempfile.TemporaryDirectory() as tempdir:
+            # download archive file
             filename = os.path.join(tempdir, re.sub(r"^.*/", "", archive_url))
             file = open(filename, mode="wb")
             total_length = int(resp.headers['Content-Length'])
@@ -2048,11 +2049,13 @@ class Sdk(_ProjectCommand):
             self.inf(f"Downloaded: {file.name}")
             file.close()
 
+            # check sha256 hash
             with open(file.name, "rb") as sha256file:
                 digest = hashlib.sha256(sha256file.read()).hexdigest()
                 if sha256 != digest:
                     raise Exception(f"sha256 mismatched: {sha256}:{digest}")
 
+            # extract archive file
             self.inf(f"Extract: {file.name}")
             if file.name.endswith(".tar.xz"):
                 with tarfile.open(file.name, mode="r:xz") as archive:
@@ -2111,7 +2114,7 @@ class Sdk(_ProjectCommand):
             self.inf(f"Downloading {sdk_url}.")
             self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dirname)
         else:
-            self.inf(f"{target_dir} exists.")
+            self.inf(f"{target_dir} exists. Use this.")
 
         for tc in args.toolchains:
             if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
@@ -2156,21 +2159,39 @@ class Sdk(_ProjectCommand):
                     ]
                 )
 
-        self.inf(f"{os.path.basename(sdk_list[0])}:")
-        self.inf()
-        self.inf(f"  Path: {sdk_list[0]}")
 
-        with open(os.path.join(sdk_list[0], "sdk_toolchains")) as f:
+        def comparator(a_, b_):
+            a = os.path.basename(a_)
+            b = os.path.basename(b_)
+
+            if (len(a) < len(b)) and a == b[0:len(a)]:
+                return -1
+            else:
+                if a == b:
+                    return 0
+                elif a < b:
+                    return -1
+                else:
+                    return 1
+
+        sorted_sdk = sorted(sdk_list, key=cmp_to_key(comparator), reverse=True)
+        latest_sdk = sorted_sdk[0]
+
+        self.inf(f"{os.path.basename(latest_sdk)}:")
+        self.inf()
+        self.inf(f"  Path: {latest_sdk}")
+
+        with open(os.path.join(latest_sdk, "sdk_toolchains")) as f:
             toolchains = f.readlines()
 
             self.inf()
             self.inf("  Installed toolcains:")
 
             for tc in toolchains:
-                if os.path.exists(os.path.join(sdk_list[0], tc.strip())):
+                if os.path.exists(os.path.join(latest_sdk, tc.strip())):
                     self.inf(f"    {tc.strip()}")
 
-            if os.path.exists(os.path.join(sdk_list[0], "sysroots")):
+            if os.path.exists(os.path.join(latest_sdk, "sysroots")):
                 self.inf()
                 self.inf(f"  Hosttools installed:")
 
@@ -2179,10 +2200,8 @@ class Sdk(_ProjectCommand):
             for root, ds, fs in os.walk(os.path.join(os.environ.get("HOME"), ".cmake")):
                 for f in fs:
                     with open(os.path.join(root, f)) as file:
-                        if (
-                            file.readline()
-                            == os.path.join(sdk_list[0], "cmake").strip()
-                        ):
+                        line = file.readline()
+                        if line == os.path.join(latest_sdk, "cmake").strip():
                             self.inf("  Zephyr SDK CMake package registered:")
                             self.inf()
 
