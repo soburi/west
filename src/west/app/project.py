@@ -1938,7 +1938,10 @@ class Sdk(_ProjectCommand):
     def do_add_parser(self, parser_adder):
         parser = self._parser(parser_adder, epilog=GREP_EPILOG)
         parser.add_argument(
-            "--install", default=None, dest="sdk_version", help="install specified version of Zephyr SDK."
+            "--install",
+            default=None,
+            dest="sdk_version",
+            help="install specified version of Zephyr SDK.",
         ),
         parser.add_argument(
             "--hosttools", action="store_true", help="install host-tools"
@@ -1969,7 +1972,9 @@ class Sdk(_ProjectCommand):
             params = {"page": page, "per_page": 100}
             resp = requests.get(url, params=params)
             if resp.status_code != 200:
-                raise Exception(f"Failed to fetch releases: {resp.status_code}, {resp.text}")
+                raise Exception(
+                    f"Failed to fetch releases: {resp.status_code}, {resp.text}"
+                )
 
             data = resp.json()
             if not data:
@@ -1981,7 +1986,7 @@ class Sdk(_ProjectCommand):
         return releases
 
     def sdk_basename(self, release):
-        return 'zephyr-sdk-' + re.sub("^v", "", release["tag_name"])
+        return "zephyr-sdk-" + re.sub("^v", "", release["tag_name"])
 
     def minimal_sdk_filename(self, release):
         basename = self.sdk_basename(release)
@@ -2040,12 +2045,12 @@ class Sdk(_ProjectCommand):
             # download archive file
             filename = os.path.join(tempdir, re.sub(r"^.*/", "", archive_url))
             file = open(filename, mode="wb")
-            total_length = int(resp.headers['Content-Length'])
+            total_length = int(resp.headers["Content-Length"])
             count = 0
             for chunk in resp.iter_content(chunk_size=8192):
                 file.write(chunk)
                 count = count + len(chunk)
-                self.inf(f"\r {count}/{total_length}", end='')
+                self.inf(f"\r {count}/{total_length}", end="")
             self.inf(f"Downloaded: {file.name}")
             file.close()
 
@@ -2159,12 +2164,11 @@ class Sdk(_ProjectCommand):
                     ]
                 )
 
-
         def comparator(a_, b_):
             a = os.path.basename(a_)
             b = os.path.basename(b_)
 
-            if (len(a) < len(b)) and a == b[0:len(a)]:
+            if (len(a) < len(b)) and a == b[0 : len(a)]:
                 return -1
             else:
                 if a == b:
