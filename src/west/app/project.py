@@ -1967,13 +1967,11 @@ class Sdk(_ProjectCommand):
 
         while True:
             params = {"page": page, "per_page": 100}
-            response = requests.get(url, params=params)
-            if response.status_code != 200:
-                raise Exception(
-                    f"Failed to fetch releases: {response.status_code}, {response.text}"
-                )
+            resp = requests.get(url, params=params)
+            if resp.status_code != 200:
+                raise Exception(f"Failed to fetch releases: {resp.status_code}, {resp.text}")
 
-            data = response.json()
+            data = resp.json()
             if not data:
                 break
 
@@ -1982,7 +1980,11 @@ class Sdk(_ProjectCommand):
 
         return releases
 
+    def sdk_basename(self, release):
+        return 'zephyr-sdk-' + re.sub("^v", "", release["tag_name"])
+
     def minimal_sdk_filename(self, release):
+        basename = self.sdk_basename(release)
         system = platform.system()
         machine = platform.machine()
 
@@ -2000,14 +2002,10 @@ class Sdk(_ProjectCommand):
         else:
             raise Exception(f"Unsupported machine: {machine}")
 
-        version = re.sub("^v", "", release["tag_name"])
-
         if osname == "windows":
-            name = "zephyr-sdk-" + version + "_" + osname + "-" + arch + "_minimal.7z"
+            name = basename + "_" + osname + "-" + arch + "_minimal.7z"
         else:
-            name = (
-                "zephyr-sdk-" + version + "_" + osname + "-" + arch + "_minimal.tar.xz"
-            )
+            name = basename + "_" + osname + "-" + arch + "_minimal.tar.xz"
 
         return name
 
@@ -2034,16 +2032,16 @@ class Sdk(_ProjectCommand):
         return hashtable
 
     def download_and_extract(self, archive_url, sha256, install_base, sdk_dir):
-        response = requests.get(archive_url, stream=True)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download {archive_url}: {response.status_code}")
+        resp = requests.get(archive_url, stream=True)
+        if resp.status_code != 200:
+            raise Exception(f"Failed to download {archive_url}: {resp.status_code}")
 
         with tempfile.TemporaryDirectory() as tempdir:
-            file = open(
-                os.path.join(tempdir, re.sub(r"^.*/", "", archive_url)), mode="wb"
-            )
-            for chunk in response.iter_content(chunk_size=8192):
+            filename = os.path.join(tempdir, re.sub(r"^.*/", "", archive_url))
+            file = open(filename, mode="wb")
+            for chunk in resp.iter_content(chunk_size=8192):
                 file.write(chunk)
+                self.inf(".")
             self.inf(f"Downloaded: {file.name}")
             file.close()
 
@@ -2052,6 +2050,7 @@ class Sdk(_ProjectCommand):
                 if sha256 != digest:
                     raise Exception(f"sha256 mismatched: {sha256}:{digest}")
 
+            self.inf(f"Extract: {file.name}")
             if file.name.endswith(".tar.xz"):
                 with tarfile.open(file.name, mode="r:xz") as archive:
                     archive.extractall(path=os.path.dirname(file.name))
@@ -2059,6 +2058,9 @@ class Sdk(_ProjectCommand):
                 with SevenZipFile(file.name, mode="r") as archive:
                     archive.extractall(path=os.path.dirname(file.name))
 
+            src_dir = os.path.join(os.path.dirname(file.name), sdk_dir)
+            dst_dir = os.path.join(install_base, sdk_dir)
+            self.inf(f"Copy: {src_dir} to {dst_dir}")
             if os.access(os.path.join(install_base), os.W_OK):
                 shutil.copytree(
                     os.path.join(os.path.dirname(file.name), sdk_dir),
@@ -2071,8 +2073,7 @@ class Sdk(_ProjectCommand):
                         sys.executable,
                         "-c",
                         'import shutil; shutil.copytree("{0}", "{1}")'.format(
-                            os.path.join(os.path.dirname(file.name), sdk_dir),
-                            os.path.join(install_base, sdk_dir),
+                            src_dir, dst_dir
                         ),
                     ]
                 )
@@ -2086,8 +2087,7 @@ class Sdk(_ProjectCommand):
             vertag = "v" + args.sdk_version
             target_release = next(filter(lambda x: x["tag_name"] == vertag, releases))
 
-        version = re.sub("^v", "", target_release["tag_name"])
-        sdk_dirname = "zephyr-sdk-" + version
+        sdk_dirname = self.sdk_basename(target_release)
 
         target_dir = os.path.join(args.install_base, sdk_dirname)
         if "windows" == platform.system():
@@ -2098,16 +2098,17 @@ class Sdk(_ProjectCommand):
         if not os.path.exists(setup):
             sdk_url = self.minimal_sdk_url(target_release)
 
-            response = requests.get(self.sha256_sum_url(target_release), stream=True)
-            if response.status_code != 200:
-                raise Exception(
-                    f"Failed to download {sha256_url}: {response.status_code}"
-                )
+            resp = requests.get(self.sha256_sum_url(target_release), stream=True)
+            if resp.status_code != 200:
+                raise Exception(f"Failed to download {sha256_url}: {resp.status_code}")
 
-            hashtable = self.sha256_hashtable(response.content.decode("UTF-8"))
+            hashtable = self.sha256_hashtable(resp.content.decode("UTF-8"))
             sha256 = hashtable[self.minimal_sdk_filename(target_release)]
 
+            self.inf(f"Downloading {sdk_url}.")
             self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dirname)
+        else:
+            self.inf(f"{target_dir} exists.")
 
         for tc in args.toolchains:
             if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
