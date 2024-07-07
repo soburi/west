@@ -1979,7 +1979,7 @@ class Sdk(_ProjectCommand):
 
         return releases
 
-    def query_minimal_sdk_url(self, release):
+    def query_minimal_sdk_filename(self, release):
         system = platform.system()
         machine = platform.machine()
 
@@ -1997,7 +1997,6 @@ class Sdk(_ProjectCommand):
         else:
             raise Exception(f"Unsupported machine: {machine}")
 
-        assets = release.get("assets", [])
         version = re.sub("^v", "", release["tag_name"])
 
         if osname == "windows":
@@ -2005,7 +2004,12 @@ class Sdk(_ProjectCommand):
         else:
             name = "zephyr-sdk-" + version + "_" + osname + "-" + arch + "_minimal.tar.xz"
 
-        minimal_sdk_asset = next(filter(lambda x: x["name"].startswith(name), assets))
+        return name
+
+    def query_minimal_sdk_url(self, release):
+        name = self.query_minimal_sdk_filename(release)
+        assets = release.get("assets", [])
+        minimal_sdk_asset = next(filter(lambda x: x["name"] == name, assets))
 
         return minimal_sdk_asset["browser_download_url"]
 
@@ -2131,10 +2135,8 @@ class Sdk(_ProjectCommand):
 
             self.inf()
 
-            for root, dirs, files in os.walk(
-                os.path.join(os.environ.get("HOME"), ".cmake")
-            ):
-                for f in files:
+            for root, ds, fs in os.walk(os.path.join(os.environ.get("HOME"), ".cmake")):
+                for f in fs:
                     with open(os.path.join(root, f)) as file:
                         if (
                             file.readline()
