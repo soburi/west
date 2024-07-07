@@ -2198,34 +2198,36 @@ class Sdk(_ProjectCommand):
                 else:
                     return 1
 
-        sorted_sdk = sorted(sdk_list, key=cmp_to_key(comparator), reverse=True)
-        latest_sdk = sorted_sdk[0]
+        sorted_sdks = sorted(sdk_list, key=cmp_to_key(comparator), reverse=True)
 
-        self.inf(f"{os.path.basename(latest_sdk)}:")
-        self.inf()
-        self.inf(f"  Path: {latest_sdk}")
-
-        with open(os.path.join(latest_sdk, "sdk_toolchains")) as f:
-            toolchains = f.readlines()
-
+        for sdk in sorted_sdks:
+            self.inf(f"{os.path.basename(sdk)}:")
             self.inf()
-            self.inf("  Installed toolcains:")
+            self.inf(f"  Path: {sdk}")
 
-            for tc in toolchains:
-                if os.path.exists(os.path.join(latest_sdk, tc.strip())):
-                    self.inf(f"    {tc.strip()}")
 
-            if os.path.exists(os.path.join(latest_sdk, "sysroots")):
+            with open(os.path.join(sdk, "sdk_toolchains")) as f:
+                toolchains = f.readlines()
+
                 self.inf()
-                self.inf(f"  Hosttools installed:")
+                self.inf("  Installed toolcains:")
 
-            self.inf()
+                for tc in toolchains:
+                    if os.path.exists(os.path.join(sdk, tc.strip())):
+                        self.inf(f"    {tc.strip()}")
 
-            for root, ds, fs in os.walk(os.path.join(os.environ.get("HOME"), ".cmake")):
-                for f in fs:
-                    with open(os.path.join(root, f)) as file:
-                        line = file.readline()
-                        if line == os.path.join(latest_sdk, "cmake").strip():
+                if os.path.exists(os.path.join(sdk, "sysroots")):
+                    self.inf()
+                    self.inf(f"  Hosttools installed:")
+
+                self.inf()
+
+                for root, ds, fs in os.walk(os.path.join(os.environ.get("HOME"), ".cmake")):
+                    for f in fs:
+                        with open(os.path.join(root, f)) as file:
+                            line = file.readline()
+                            if line != os.path.join(sdk, "cmake"):
+                                continue
                             self.inf("  Zephyr SDK CMake package registered:")
                             self.inf()
 
