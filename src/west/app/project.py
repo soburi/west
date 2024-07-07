@@ -1925,10 +1925,11 @@ class SelfUpdate(_ProjectCommand):
 
 SDK_RELEASE_API_URL = "https://api.github.com/repos/zephyrproject-rtos/sdk-ng/releases"
 
-SDK_EPILOG = '''
+SDK_EPILOG = """
 EXAMPLES
 --------
-'''
+"""
+
 
 class Sdk(_ProjectCommand):
     def __init__(self):
@@ -2041,7 +2042,9 @@ class Sdk(_ProjectCommand):
 
         return hashtable
 
-    def download_and_extract(self, archive_url, sha256, install_base, sdk_dir, setup_cmds):
+    def download_and_extract(
+        self, archive_url, sha256, install_base, sdk_dir, setup_cmds
+    ):
         resp = requests.get(archive_url, stream=True)
         if resp.status_code != 200:
             raise Exception(f"Failed to download {archive_url}: {resp.status_code}")
@@ -2079,12 +2082,12 @@ class Sdk(_ProjectCommand):
             dst_dir = os.path.join(install_base, sdk_dir)
             self.inf(f"Copy: {src_dir} to {dst_dir} and run setup script...")
 
-            cmd_copytree = f'''
+            cmd_copytree = f"""
                     {sys.executable} -c \"
                     import shutil;
                     shutil.copytree(\\\"{src_dir}\\\", \\\"{dst_dir}\\\")
                     \" ;
-                    '''
+                    """
             cmd_setup = " ".join(setup_cmds)
             cmds = ["sh", "-c", cmd_copytree + cmd_setup]
 
@@ -2148,7 +2151,9 @@ class Sdk(_ProjectCommand):
             cmd_setup = " ".join(cmds)
             cmds = ["sh", "-c", cmd_setup]
 
-            if not os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
+            if not os.access(
+                os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK
+            ):
                 cmds.insert(0, "sudo")
 
             subprocess.run(cmds)
@@ -2218,7 +2223,9 @@ class Sdk(_ProjectCommand):
 
                 self.inf()
 
-                for root, ds, fs in os.walk(os.path.join(os.environ.get("HOME"), ".cmake")):
+                for root, ds, fs in os.walk(
+                    os.path.join(os.environ.get("HOME"), ".cmake")
+                ):
                     for f in fs:
                         with open(os.path.join(root, f)) as file:
                             line = file.readline()
