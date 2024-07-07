@@ -1969,9 +1969,7 @@ class Sdk(_ProjectCommand):
             params = {"page": page, "per_page": 100}
             resp = requests.get(url, params=params)
             if resp.status_code != 200:
-                raise Exception(
-                    f"Failed to fetch releases: {resp.status_code}, {resp.text}"
-                )
+                raise Exception(f"Failed to fetch releases: {resp.status_code}, {resp.text}")
 
             data = resp.json()
             if not data:
@@ -1983,7 +1981,7 @@ class Sdk(_ProjectCommand):
         return releases
 
     def sdk_basename(self, release):
-        return "zephyr-sdk-" + re.sub("^v", "", release["tag_name"])
+        return 'zephyr-sdk-' + re.sub("^v", "", release["tag_name"])
 
     def minimal_sdk_filename(self, release):
         basename = self.sdk_basename(release)
@@ -2041,9 +2039,12 @@ class Sdk(_ProjectCommand):
         with tempfile.TemporaryDirectory() as tempdir:
             filename = os.path.join(tempdir, re.sub(r"^.*/", "", archive_url))
             file = open(filename, mode="wb")
+            total_length = int(resp.headers['Content-Length'])
+            count = 0
             for chunk in resp.iter_content(chunk_size=8192):
                 file.write(chunk)
-                self.inf(".")
+                count = count + len(chunk)
+                self.inf(f"\r {count}/{total_length}", end='')
             self.inf(f"Downloaded: {file.name}")
             file.close()
 
