@@ -7,6 +7,7 @@
 
 import argparse
 from functools import partial
+import hashlib
 import json
 import logging
 import os
@@ -1960,7 +1961,7 @@ class Sdk(_ProjectCommand):
 
         return parser
 
-    def request_all_releases(self, url):
+    def fetch_all_releases(self, url):
         releases = []
         page = 1
         
@@ -1979,7 +1980,7 @@ class Sdk(_ProjectCommand):
 
         return releases
 
-    def query_minimal_sdk_filename(self, release):
+    def minimal_sdk_filename(self, release):
         system = platform.system()
         machine = platform.machine()
 
@@ -2006,26 +2007,45 @@ class Sdk(_ProjectCommand):
 
         return name
 
-    def query_minimal_sdk_url(self, release):
-        name = self.query_minimal_sdk_filename(release)
+    def minimal_sdk_url(self, release):
+        name = self.minimal_sdk_filename(release)
         assets = release.get("assets", [])
         minimal_sdk_asset = next(filter(lambda x: x["name"] == name, assets))
 
         return minimal_sdk_asset["browser_download_url"]
 
-    def download_and_extract(self, download_url, install_base, sdk_dir):
-        response = requests.get(download_url, stream=True)
+    def sha256_sum_url(self, release):
+        assets = release.get("assets", [])
+        minimal_sdk_asset = next(filter(lambda x: x["name"] == 'sha256.sum', assets))
+
+        return minimal_sdk_asset["browser_download_url"]
+
+    def sha256_hashtable(self, sha256_list):
+        hashtable = {}
+
+        for line in sha256_list.splitlines():
+            tuple = re.split(r'\s+', line)
+            hashtable[tuple[1]] = tuple[0]
+
+        return hashtable
+
+
+    def download_and_extract(self, archive_url, sha256, install_base, sdk_dir):
+        response = requests.get(archive_url, stream=True)
         if response.status_code != 200:
-            raise Exception(
-                f"Failed to download {download_url}: {response.status_code}"
-            )
+            raise Exception(f"Failed to download {archive_url}: {response.status_code}")
 
         with tempfile.TemporaryDirectory() as tempdir:
-            file = open(os.path.join(tempdir, re.sub(r'^.*/', '', download_url)), mode="wb")
+            file = open(os.path.join(tempdir, re.sub(r'^.*/', '', archive_url)), mode="wb")
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
             self.inf(f"Downloaded: {file.name}")
             file.close()
+
+            with open(file.name, 'rb') as sha256file:
+                digest = hashlib.sha256(sha256file.read()).hexdigest()
+                if sha256 != digest:
+                    raise Exception(f"sha256 mismatched: {sha256}:{digest}")
 
             if file.name.endswith(".tar.xz"):
                 with tarfile.open(file.name, mode="r:xz") as archive:
@@ -2053,39 +2073,49 @@ class Sdk(_ProjectCommand):
                 )
     
     def install_sdk(self, args, user_args):
-        releases = self.request_all_releases(GITHUB_API_URL)
+        releases = self.fetch_all_releases(GITHUB_API_URL)
 
         if args.sdk_version == "latest":
             target_release = releases[0]
         else:
-            target_release = next(
-                filter(lambda x: x["tag_name"] == ("v" + args.sdk_version), releases)
-            )
+            vertag = "v" + args.sdk_version
+            target_release = next(filter(lambda x: x["tag_name"] == vertag, releases))
 
         version = re.sub("^v", "", target_release["tag_name"])
         sdk_dirname = "zephyr-sdk-" + version
 
         target_dir = os.path.join(args.install_base, sdk_dirname)
-        setup_cmd = os.path.join(args.install_base, sdk_dirname, "setup.sh")
+        if "windows" == platform.system():
+            setup = os.path.join(target_dir, "setup.cmd")
+        else:
+            setup = os.path.join(target_dir, "setup.sh")
 
-        if not os.path.exists(target_dir):
-            download_url = self.query_minimal_sdk_url(target_release)
-            self.download_and_extract(download_url, args.install_base, sdk_dirname)
+        if not os.path.exists(setup):
+            sdk_url = self.minimal_sdk_url(target_release)
+
+            response = requests.get(self.sha256_sum_url(target_release), stream=True)
+            if response.status_code != 200:
+                raise Exception(f"Failed to download {sha256_url}: {response.status_code}")
+
+            hashtable = self.sha256_hashtable(response.content.decode("UTF-8"))
+            sha256 = hashtable[self.minimal_sdk_filename(target_release)]
+
+            self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dirname)
 
         for tc in args.toolchains:
             if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
-                subprocess.run([setup_cmd, "-t", tc])
+                subprocess.run([setup, "-t", tc])
             else:
-                subprocess.run(["sudo", setup_cmd, "-t", tc])
+                subprocess.run(["sudo", setup, "-t", tc])
 
         if args.hosttools:
             if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
-                subprocess.run([setup_cmd, "-h"])
+                subprocess.run([setup, "-h"])
             else:
-                subprocess.run(["sudo", setup_cmd, "-h"])
+                subprocess.run(["sudo", setup, "-h"])
 
         if args.cmake_pkg:
-            subprocess.run([setup_cmd, "-c"])
+            subprocess.run([setup, "-c"])
 
     def list_sdk(self, args, user_args):
         searchpath = [
