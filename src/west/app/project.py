@@ -1923,8 +1923,12 @@ class SelfUpdate(_ProjectCommand):
         self.die(self.description)
 
 
-GITHUB_API_URL = "https://api.github.com/repos/zephyrproject-rtos/sdk-ng/releases"
+SDK_RELEASE_API_URL = "https://api.github.com/repos/zephyrproject-rtos/sdk-ng/releases"
 
+SDK_EPILOG = '''
+EXAMPLES
+--------
+'''
 
 class Sdk(_ProjectCommand):
     def __init__(self):
@@ -1936,11 +1940,12 @@ class Sdk(_ProjectCommand):
         )
 
     def do_add_parser(self, parser_adder):
-        parser = self._parser(parser_adder, epilog=GREP_EPILOG)
+        parser = self._parser(parser_adder, epilog=SDK_EPILOG)
         parser.add_argument(
             "--install",
             default=None,
             dest="sdk_version",
+            metavar="SDK_VER",
             help="install specified version of Zephyr SDK.",
         ),
         parser.add_argument(
@@ -1952,14 +1957,14 @@ class Sdk(_ProjectCommand):
         parser.add_argument(
             "--install-base",
             default=os.path.expanduser("~"),
-            help="install destination base",
+            metavar="BASE",
+            help="specify install base directory. Use $HOME as default",
         ),
         parser.add_argument(
             "--toolchains",
             nargs="*",
-            default=[],
             type=str,
-            help="a list of install too",
+            help="specify installing toolchains",
         )
 
         return parser
@@ -2090,7 +2095,8 @@ class Sdk(_ProjectCommand):
                 )
 
     def install_sdk(self, args, user_args):
-        releases = self.fetch_all_releases(GITHUB_API_URL)
+        self.inf("Fetching Zephyr SDK list...")
+        releases = self.fetch_all_releases(SDK_RELEASE_API_URL)
 
         if args.sdk_version == "latest":
             target_release = releases[0]
@@ -2098,17 +2104,35 @@ class Sdk(_ProjectCommand):
             vertag = "v" + args.sdk_version
             target_release = next(filter(lambda x: x["tag_name"] == vertag, releases))
 
-        sdk_dirname = self.sdk_basename(target_release)
+        sdk_dir = self.sdk_basename(target_release)
 
-        target_dir = os.path.join(args.install_base, sdk_dirname)
+        target_dir = os.path.join(args.install_base, sdk_dir)
         if "windows" == platform.system():
             setup = os.path.join(target_dir, "setup.cmd")
+            optsep = "/"
         else:
             setup = os.path.join(target_dir, "setup.sh")
+            optsep = "-"
+
+        cmds = [setup]
+
+        if args.toolchains != None or args.hosttools or args.cmake_pkg:
+            if "all" in args.toolchains:
+                cmds.extend([optsep + "t", "all"])
+            else:
+                for tc in args.toolchains:
+                    cmds.extend([optsep + "t", tc])
+
+            if args.hosttools:
+                cmds.extend([optsep + "h"])
+
+            if args.cmake_pkg:
+                cmds.extend([optsep + "c"])
 
         if not os.path.exists(setup):
             sdk_url = self.minimal_sdk_url(target_release)
 
+            self.inf("Fetching assets list...")
             resp = requests.get(self.sha256_sum_url(target_release), stream=True)
             if resp.status_code != 200:
                 raise Exception(f"Failed to download {sha256_url}: {resp.status_code}")
@@ -2117,24 +2141,20 @@ class Sdk(_ProjectCommand):
             sha256 = hashtable[self.minimal_sdk_filename(target_release)]
 
             self.inf(f"Downloading {sdk_url}.")
-            self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dirname)
+            self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dir)
+
+            if os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
+                cmds.insert(0, "sudo")
+
+            subprocess.run(cmds)
         else:
             self.inf(f"{target_dir} exists. Use this.")
 
-        for tc in args.toolchains:
-            if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
-                subprocess.run([setup, "-t", tc])
-            else:
-                subprocess.run(["sudo", setup, "-t", tc])
+            if os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
+                cmds.insert(0, "sudo")
 
-        if args.hosttools:
-            if os.access(os.path.join(install_base, sdk_dir), os.W_OK):
-                subprocess.run([setup, "-h"])
-            else:
-                subprocess.run(["sudo", setup, "-h"])
+            subprocess.run(cmds)
 
-        if args.cmake_pkg:
-            subprocess.run([setup, "-c"])
 
     def list_sdk(self, args, user_args):
         searchpath = [
