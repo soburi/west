@@ -5,29 +5,23 @@
 
 '''West project commands'''
 
-import requests
-import os
-import json
-import sys
-import platform
-import re
-import tempfile
-import tarfile
-import subprocess
-import shutil
-import py7zr
-
-
 import argparse
 from functools import partial
+import json
 import logging
 import os
 from os.path import abspath, relpath
 from pathlib import PurePath, Path
+import platform
+from py7zr import SevenZipFile
+import re
+import requests
 import shutil
 import shlex
 import subprocess
 import sys
+import tarfile
+import tempfile
 import textwrap
 from time import perf_counter
 from urllib.parse import urlparse
@@ -2033,7 +2027,7 @@ class Sdk(_ProjectCommand):
                 with tarfile.open(file.name, mode="r:xz") as archive:
                     archive.extractall(path=os.path.dirname(file.name))
             else:
-                with py7zr.SevenZipFile(file.name, mode='r') as archive:
+                with SevenZipFile(file.name, mode='r') as archive:
                     archive.extractall(path=os.path.dirname(file.name))
 
             if os.access(os.path.join(install_base), os.W_OK):
