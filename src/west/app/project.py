@@ -2041,7 +2041,7 @@ class Sdk(_ProjectCommand):
 
         return hashtable
 
-    def download_and_extract(self, archive_url, sha256, install_base, sdk_dir):
+    def download_and_extract(self, archive_url, sha256, install_base, sdk_dir, setup_cmds):
         resp = requests.get(archive_url, stream=True)
         if resp.status_code != 200:
             raise Exception(f"Failed to download {archive_url}: {resp.status_code}")
@@ -2056,6 +2056,7 @@ class Sdk(_ProjectCommand):
                 file.write(chunk)
                 count = count + len(chunk)
                 self.inf(f"\r {count}/{total_length}", end="")
+            self.inf()
             self.inf(f"Downloaded: {file.name}")
             file.close()
 
@@ -2076,23 +2077,21 @@ class Sdk(_ProjectCommand):
 
             src_dir = os.path.join(os.path.dirname(file.name), sdk_dir)
             dst_dir = os.path.join(install_base, sdk_dir)
-            self.inf(f"Copy: {src_dir} to {dst_dir}")
-            if os.access(os.path.join(install_base), os.W_OK):
-                shutil.copytree(
-                    os.path.join(os.path.dirname(file.name), sdk_dir),
-                    os.path.join(install_base, sdk_dir),
-                )
-            else:
-                subprocess.run(
-                    [
-                        "sudo",
-                        sys.executable,
-                        "-c",
-                        'import shutil; shutil.copytree("{0}", "{1}")'.format(
-                            src_dir, dst_dir
-                        ),
-                    ]
-                )
+            self.inf(f"Copy: {src_dir} to {dst_dir} and run setup script...")
+
+            cmd_copytree = f'''
+                    {sys.executable} -c \"
+                    import shutil;
+                    shutil.copytree(\\\"{src_dir}\\\", \\\"{dst_dir}\\\")
+                    \" ;
+                    '''
+            cmd_setup = " ".join(setup_cmds)
+            cmds = ["sh", "-c", cmd_copytree + cmd_setup]
+
+            if not os.access(os.path.join(install_base), os.W_OK):
+                cmds.insert(0, "sudo")
+
+            subprocess.run(cmds)
 
     def install_sdk(self, args, user_args):
         self.inf("Fetching Zephyr SDK list...")
@@ -2141,20 +2140,18 @@ class Sdk(_ProjectCommand):
             sha256 = hashtable[self.minimal_sdk_filename(target_release)]
 
             self.inf(f"Downloading {sdk_url}.")
-            self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dir)
+            self.download_and_extract(sdk_url, sha256, args.install_base, sdk_dir, cmds)
 
-            if os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
-                cmds.insert(0, "sudo")
-
-            subprocess.run(cmds)
         else:
             self.inf(f"{target_dir} exists. Use this.")
 
-            if os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
+            cmd_setup = " ".join(cmds)
+            cmds = ["sh", "-c", cmd_setup]
+
+            if not os.access(os.path.join(args.install_base, sdk_dir, ".w_ok"), os.W_OK):
                 cmds.insert(0, "sudo")
 
             subprocess.run(cmds)
-
 
     def list_sdk(self, args, user_args):
         searchpath = [
@@ -2204,7 +2201,6 @@ class Sdk(_ProjectCommand):
             self.inf(f"{os.path.basename(sdk)}:")
             self.inf()
             self.inf(f"  Path: {sdk}")
-
 
             with open(os.path.join(sdk, "sdk_toolchains")) as f:
                 toolchains = f.readlines()
