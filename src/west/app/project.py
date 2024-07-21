@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-'''West project commands'''
+"""West project commands"""
 
 import argparse
 from functools import partial, cmp_to_key
@@ -30,8 +30,13 @@ from urllib.parse import urlparse
 from west.configuration import Configuration
 from west import util
 from west.commands import WestCommand, CommandError, Verbosity
-from west.manifest import ImportFlag, Manifest, \
-    ManifestProject, _manifest_content_at, ManifestImportFailed
+from west.manifest import (
+    ImportFlag,
+    Manifest,
+    ManifestProject,
+    _manifest_content_at,
+    ManifestImportFailed,
+)
 from west.manifest import is_group as is_project_group
 from west.manifest import MANIFEST_REV_BRANCH as MANIFEST_REV
 from west.manifest import Submodule
@@ -43,6 +48,7 @@ from west.manifest import QUAL_REFS_WEST as QUAL_REFS
 # "diff", etc.
 #
 
+
 class _ProjectCommand(WestCommand):
     # Helper class which contains common code needed by various commands
     # in this file.
@@ -50,9 +56,9 @@ class _ProjectCommand(WestCommand):
     def _parser(self, parser_adder, **kwargs):
         # Create and return a "standard" parser.
 
-        kwargs['help'] = self.help
-        kwargs['description'] = self.description
-        kwargs['formatter_class'] = argparse.RawDescriptionHelpFormatter
+        kwargs["help"] = self.help
+        kwargs["description"] = self.description
+        kwargs["formatter_class"] = argparse.RawDescriptionHelpFormatter
         return parser_adder.add_parser(self.name, **kwargs)
 
     def _cloned_projects(self, args, only_active=False):
@@ -75,17 +81,19 @@ class _ProjectCommand(WestCommand):
             return self.manifest.get_projects(ids, only_cloned=only_cloned)
         except ValueError as ve:
             if len(ve.args) != 2:
-                raise          # not directly raised by get_projects()
+                raise  # not directly raised by get_projects()
 
             # Die with an error message on unknown or uncloned projects.
             unknown, uncloned = ve.args
             if unknown:
                 self._die_unknown(unknown)
             elif only_cloned and uncloned:
-                s = 's' if len(uncloned) > 1 else ''
-                names = ' '.join(p.name for p in uncloned)
-                self.die(f'uncloned project{s}: {names}.\n'
-                         '  Hint: run "west update" and retry.')
+                s = "s" if len(uncloned) > 1 else ""
+                names = " ".join(p.name for p in uncloned)
+                self.die(
+                    f"uncloned project{s}: {names}.\n"
+                    '  Hint: run "west update" and retry.'
+                )
             else:
                 # Should never happen, but re-raise to fail fast and
                 # preserve a stack trace, to encourage a bug report.
@@ -99,30 +107,34 @@ class _ProjectCommand(WestCommand):
         if not failed:
             return
         elif len(failed) < 20:
-            s = 's:' if len(failed) > 1 else ''
-            projects = ', '.join(f'{p.name}' for p in failed)
-            self.err(f'{self.name} failed for project{s} {projects}')
+            s = "s:" if len(failed) > 1 else ""
+            projects = ", ".join(f"{p.name}" for p in failed)
+            self.err(f"{self.name} failed for project{s} {projects}")
         else:
-            self.err(f'{self.name} failed for multiple projects; see above')
+            self.err(f"{self.name} failed for multiple projects; see above")
         raise CommandError(1)
 
     def _die_unknown(self, unknown):
         # Scream and die about unknown projects.
 
-        s = 's' if len(unknown) > 1 else ''
-        names = ' '.join(unknown)
-        self.die(f'unknown project name{s}/path{s}: {names}\n'
-                 '  Hint: use "west list" to list all projects.')
+        s = "s" if len(unknown) > 1 else ""
+        names = " ".join(unknown)
+        self.die(
+            f"unknown project name{s}/path{s}: {names}\n"
+            '  Hint: use "west list" to list all projects.'
+        )
 
     def _has_nonempty_status(self, project):
         # Check if the project has any status output to print. We
         # manually use Popen in order to try to exit as quickly as
         # possible if 'git status' prints anything.
 
-        popen = subprocess.Popen(['git', 'status', '--porcelain'],
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE,
-                                 cwd=project.abspath)
+        popen = subprocess.Popen(
+            ["git", "status", "--porcelain"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=project.abspath,
+        )
 
         def has_output():
             # 'git status --porcelain' prints nothing if there
@@ -144,13 +156,14 @@ class _ProjectCommand(WestCommand):
 
         return has_output()
 
+
 class Init(_ProjectCommand):
 
     def __init__(self):
         super().__init__(
-            'init',
-            'create a west workspace',
-            f'''\
+            "init",
+            "create a west workspace",
+            f"""\
 Creates a west workspace.
 
 With -l, creates a workspace around an existing local repository;
@@ -172,8 +185,9 @@ filesystem. Find other, similar "Access is denied" examples in west
 issue #558.
 This is not required on inode-based, Linux filesystems that wait and
 finalize the deletion until there is no concurrent user left.
-''',
-            requires_workspace=False)
+""",
+            requires_workspace=False,
+        )
 
     def do_add_parser(self, parser_adder):
         # We set a custom usage because there are two distinct ways
@@ -182,58 +196,81 @@ finalize the deletion until there is no concurrent user left.
 
         parser = self._parser(
             parser_adder,
-            usage='''
+            usage="""
 
   %(prog)s [-m URL] [--mr REVISION] [--mf FILE] [directory]
   %(prog)s -l [--mf FILE] directory
-''')
+""",
+        )
 
         # Remember to update the usage if you modify any arguments.
 
-        parser.add_argument('-m', '--manifest-url',
-                            help='''manifest repository URL to clone;
-                            cannot be combined with -l''')
-        parser.add_argument('--mr', '--manifest-rev', dest='manifest_rev',
-                            help='''manifest repository branch or tag name
-                            to check out first; cannot be combined with -l''')
-        parser.add_argument('--mf', '--manifest-file', dest='manifest_file',
-                            help='manifest file name to use')
-        parser.add_argument('-l', '--local', action='store_true',
-                            help='''use "directory" as an existing local
+        parser.add_argument(
+            "-m",
+            "--manifest-url",
+            help="""manifest repository URL to clone;
+                            cannot be combined with -l""",
+        )
+        parser.add_argument(
+            "--mr",
+            "--manifest-rev",
+            dest="manifest_rev",
+            help="""manifest repository branch or tag name
+                            to check out first; cannot be combined with -l""",
+        )
+        parser.add_argument(
+            "--mf",
+            "--manifest-file",
+            dest="manifest_file",
+            help="manifest file name to use",
+        )
+        parser.add_argument(
+            "-l",
+            "--local",
+            action="store_true",
+            help='''use "directory" as an existing local
                             manifest repository instead of cloning one from
                             MANIFEST_URL; .west is created next to "directory"
                             in this case, and manifest.path points at
-                            "directory"''')
+                            "directory"''',
+        )
 
         parser.add_argument(
-            'directory', nargs='?', default=None,
-            help='''with -l, the path to the local manifest repository;
+            "directory",
+            nargs="?",
+            default=None,
+            help="""with -l, the path to the local manifest repository;
             without it, the directory to create the workspace in (defaulting
-            to the current working directory in this case)''')
+            to the current working directory in this case)""",
+        )
 
         return parser
 
     def do_run(self, args, _):
         if self.topdir:
-            zb = os.environ.get('ZEPHYR_BASE')
+            zb = os.environ.get("ZEPHYR_BASE")
             if zb:
-                msg = textwrap.dedent(f'''
+                msg = textwrap.dedent(
+                    f"""
                 Note:
                     In your environment, ZEPHYR_BASE is set to:
                     {zb}
 
                     This forces west to search for a workspace there.
-                    Try unsetting ZEPHYR_BASE and re-running this command.''')
+                    Try unsetting ZEPHYR_BASE and re-running this command."""
+                )
             else:
-                west_dir = Path(self.topdir) / '.west'
-                msg = ("\n  Hint: if you do not want a workspace there, \n"
-                       "  remove this directory and re-run this command:\n\n"
-                       f"  {west_dir}")
+                west_dir = Path(self.topdir) / ".west"
+                msg = (
+                    "\n  Hint: if you do not want a workspace there, \n"
+                    "  remove this directory and re-run this command:\n\n"
+                    f"  {west_dir}"
+                )
 
             self.die_already(self.topdir, msg)
 
         if args.local and (args.manifest_url or args.manifest_rev):
-            self.die('-l cannot be combined with -m or --mr')
+            self.die("-l cannot be combined with -m or --mr")
 
         self.die_if_no_git()
 
@@ -249,7 +286,7 @@ finalize the deletion until there is no concurrent user left.
 
     def local(self, args) -> Path:
         if args.manifest_rev is not None:
-            self.die('--mr cannot be used with -l')
+            self.die("--mr cannot be used with -l")
 
         # We need to resolve this to handle the case that args.directory
         # is '.'. In that case, Path('.').parent is just Path('.') instead of
@@ -257,35 +294,33 @@ finalize the deletion until there is no concurrent user left.
         #
         # https://docs.python.org/3/library/pathlib.html#pathlib.PurePath.parent
         manifest_dir = Path(args.directory or os.getcwd()).resolve()
-        manifest_filename = args.manifest_file or 'west.yml'
+        manifest_filename = args.manifest_file or "west.yml"
         manifest_file = manifest_dir / manifest_filename
         topdir = manifest_dir.parent
         rel_manifest = manifest_dir.name
         west_dir = topdir / WEST_DIR
 
         if not manifest_file.is_file():
-            self.die(f'can\'t init: no {manifest_filename} found in '
-                     f'{manifest_dir}')
+            self.die(f"can't init: no {manifest_filename} found in " f"{manifest_dir}")
 
-        self.banner('Initializing from existing manifest repository',
-                    rel_manifest)
-        self.small_banner(f'Creating {west_dir} and local configuration file')
+        self.banner("Initializing from existing manifest repository", rel_manifest)
+        self.small_banner(f"Creating {west_dir} and local configuration file")
         self.create(west_dir)
         os.chdir(topdir)
         self.config = Configuration(topdir=topdir)
-        self.config.set('manifest.path', os.fspath(rel_manifest))
-        self.config.set('manifest.file', manifest_filename)
+        self.config.set("manifest.path", os.fspath(rel_manifest))
+        self.config.set("manifest.file", manifest_filename)
 
         return topdir
 
     def bootstrap(self, args) -> Path:
         topdir = Path(abspath(args.directory or os.getcwd()))
-        self.banner('Initializing in', topdir)
+        self.banner("Initializing in", topdir)
 
         manifest_url = args.manifest_url or MANIFEST_URL_DEFAULT
         if args.manifest_rev:
             # This works with tags, too.
-            branch_opt = ['--branch', args.manifest_rev]
+            branch_opt = ["--branch", args.manifest_rev]
         else:
             branch_opt = []
         west_dir = topdir / WEST_DIR
@@ -300,37 +335,46 @@ finalize the deletion until there is no concurrent user left.
             self.create(topdir, exist_ok=False)
 
         # Clone the manifest repository into a temporary directory.
-        tempdir: Path = west_dir / 'manifest-tmp'
+        tempdir: Path = west_dir / "manifest-tmp"
         if tempdir.is_dir():
-            self.dbg('removing existing temporary manifest directory', tempdir)
+            self.dbg("removing existing temporary manifest directory", tempdir)
             shutil.rmtree(tempdir)
         try:
             self.small_banner(
-                f'Cloning manifest repository from {manifest_url}' +
-                (f', rev. {args.manifest_rev}' if args.manifest_rev else ''))
+                f"Cloning manifest repository from {manifest_url}"
+                + (f", rev. {args.manifest_rev}" if args.manifest_rev else "")
+            )
 
-            self.check_call(['git', 'clone'] + branch_opt +
-                            [manifest_url, os.fspath(tempdir)])
+            self.check_call(
+                ["git", "clone"] + branch_opt + [manifest_url, os.fspath(tempdir)]
+            )
         except subprocess.CalledProcessError:
             shutil.rmtree(tempdir, ignore_errors=True)
             raise
 
         # Verify the manifest file exists.
-        temp_manifest_filename = args.manifest_file or 'west.yml'
+        temp_manifest_filename = args.manifest_file or "west.yml"
         temp_manifest = tempdir / temp_manifest_filename
         if not temp_manifest.is_file():
-            self.die(f'can\'t init: no {temp_manifest_filename} found in '
-                     f'{tempdir}\n'
-                     f'  Hint: check --manifest-url={manifest_url}' +
-                     (f' and --manifest-rev={args.manifest_rev}'
-                      if args.manifest_rev else '') +
-                     f'  You may need to remove {west_dir} before retrying.')
+            self.die(
+                f"can't init: no {temp_manifest_filename} found in "
+                f"{tempdir}\n"
+                f"  Hint: check --manifest-url={manifest_url}"
+                + (
+                    f" and --manifest-rev={args.manifest_rev}"
+                    if args.manifest_rev
+                    else ""
+                )
+                + f"  You may need to remove {west_dir} before retrying."
+            )
 
         # Parse the manifest to get "self: path:", if it declares one.
         # Otherwise, use the URL. Ignore imports -- all we really
         # want to know is if there's a "self: path:" or not.
-        manifest = Manifest.from_data(temp_manifest.read_text(encoding=Manifest.encoding),
-                                      import_flags=ImportFlag.IGNORE)
+        manifest = Manifest.from_data(
+            temp_manifest.read_text(encoding=Manifest.encoding),
+            import_flags=ImportFlag.IGNORE,
+        )
         if manifest.yaml_path:
             manifest_path = manifest.yaml_path
         else:
@@ -342,8 +386,7 @@ finalize the deletion until there is no concurrent user left.
 
         manifest_abspath = topdir / manifest_path
 
-        self.dbg('moving', tempdir, 'to', manifest_abspath,
-                 level=Verbosity.DBG_EXTREME)
+        self.dbg("moving", tempdir, "to", manifest_abspath, level=Verbosity.DBG_EXTREME)
 
         # As shutil.move() is used to relocate tempdir, if manifest_abspath
         # is an existing directory, tmpdir will be moved _inside_ it, instead
@@ -351,17 +394,17 @@ finalize the deletion until there is no concurrent user left.
         # but is not a directory, then semantics depend on os.rename(), so
         # avoid that too...
         if manifest_abspath.exists():
-            self.die(f'target directory already exists ({manifest_abspath})')
+            self.die(f"target directory already exists ({manifest_abspath})")
 
         manifest_abspath.parent.mkdir(parents=True, exist_ok=True)
         try:
             shutil.move(os.fspath(tempdir), os.fspath(manifest_abspath))
         except shutil.Error as e:
             self.die(e)
-        self.small_banner('setting manifest.path to', manifest_path)
+        self.small_banner("setting manifest.path to", manifest_path)
         self.config = Configuration(topdir=topdir)
-        self.config.set('manifest.path', manifest_path)
-        self.config.set('manifest.file', temp_manifest_filename)
+        self.config.set("manifest.path", manifest_path)
+        self.config.set("manifest.file", temp_manifest_filename)
 
         return topdir
 
@@ -369,26 +412,30 @@ finalize the deletion until there is no concurrent user left.
         try:
             directory.mkdir(parents=True, exist_ok=exist_ok)
         except PermissionError:
-            self.die(f'Cannot initialize in {directory}: permission denied')
+            self.die(f"Cannot initialize in {directory}: permission denied")
         except FileExistsError:
-            self.die(f'Cannot initialize in {directory}: it already exists')
+            self.die(f"Cannot initialize in {directory}: it already exists")
         except Exception as e:
             self.die(f"Can't create {directory}: {e}")
+
 
 class List(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'list',
-            'print information about projects',
-            textwrap.dedent('''\
+            "list",
+            "print information about projects",
+            textwrap.dedent(
+                """\
             Print information about projects in the west manifest,
-            using format strings.'''))
+            using format strings."""
+            ),
+        )
 
     def do_add_parser(self, parser_adder):
-        default_fmt = '{name:12} {path:28} {revision:40} {url}'
+        default_fmt = "{name:12} {path:28} {revision:40} {url}"
         parser = self._parser(
             parser_adder,
-            epilog=f'''\
+            epilog=f"""\
 {ACTIVE_PROJECTS_HELP}
 
 FORMAT STRINGS
@@ -418,21 +465,34 @@ The following arguments are available:
   otherwise
 - clone_depth: project clone depth if specified, "None" otherwise
 - groups: project groups, as a comma-separated list
-''')
-        parser.add_argument('-a', '--all', action='store_true',
-                            help='include inactive projects'),
-        parser.add_argument('--manifest-path-from-yaml', action='store_true',
-                            help='''print the manifest repository's path
+""",
+        )
+        parser.add_argument(
+            "-a", "--all", action="store_true", help="include inactive projects"
+        ),
+        parser.add_argument(
+            "--manifest-path-from-yaml",
+            action="store_true",
+            help="""print the manifest repository's path
                             according to the manifest file YAML, which may
                             disagree with the manifest.path configuration
-                            option'''),
-        parser.add_argument('-f', '--format', default=default_fmt,
-                            help='''format string to use to list each
-                            project; see FORMAT STRINGS below.''')
+                            option""",
+        ),
+        parser.add_argument(
+            "-f",
+            "--format",
+            default=default_fmt,
+            help="""format string to use to list each
+                            project; see FORMAT STRINGS below.""",
+        )
 
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            see ACTIVE PROJECTS below''')
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            see ACTIVE PROJECTS below""",
+        )
 
         return parser
 
@@ -442,8 +502,9 @@ The following arguments are available:
 
             if not project.is_cloned():
                 self.die(
-                    f'cannot get sha for uncloned project {project.name}; '
-                    f'run "west update {project.name}" and retry')
+                    f"cannot get sha for uncloned project {project.name}; "
+                    f'run "west update {project.name}" and retry'
+                )
             elif isinstance(project, ManifestProject):
                 return f'{"N/A":40}'
             else:
@@ -460,9 +521,8 @@ The following arguments are available:
         for project in self._projects(args.projects):
             # Skip inactive projects unless the user said
             # --all or named some projects explicitly.
-            if not (args.all or args.projects or
-                    self.manifest.is_active(project)):
-                self.dbg(f'{project.name}: skipping inactive project')
+            if not (args.all or args.projects or self.manifest.is_active(project)):
+                self.dbg(f"{project.name}: skipping inactive project")
                 continue
 
             # Spelling out the format keys explicitly here gives us
@@ -479,8 +539,9 @@ The following arguments are available:
                     # more evidence we should tackle #327.
                     if args.manifest_path_from_yaml:
                         path = self.manifest.yaml_path
-                        apath = (abspath(os.path.join(self.topdir, path))
-                                 if path else None)
+                        apath = (
+                            abspath(os.path.join(self.topdir, path)) if path else None
+                        )
                         ppath = Path(apath).as_posix() if apath else None
                     else:
                         path = self.manifest.repo_path
@@ -494,28 +555,32 @@ The following arguments are available:
                 result = args.format.format(
                     name=project.name,
                     description=project.description or "None",
-                    url=project.url or 'N/A',
+                    url=project.url or "N/A",
                     path=path,
                     abspath=apath,
                     posixpath=ppath,
-                    revision=project.revision or 'N/A',
+                    revision=project.revision or "N/A",
                     clone_depth=project.clone_depth or "None",
                     cloned=delay(cloned_thunk, project),
                     sha=delay(sha_thunk, project),
-                    groups=','.join(project.groups))
+                    groups=",".join(project.groups),
+                )
             except KeyError as e:
                 # The raised KeyError seems to just put the first
                 # invalid argument in the args tuple, regardless of
                 # how many unrecognizable keys there were.
-                self.die(f'unknown key "{e.args[0]}" in format string '
-                         f'{shlex.quote(args.format)}')
+                self.die(
+                    f'unknown key "{e.args[0]}" in format string '
+                    f"{shlex.quote(args.format)}"
+                )
             except IndexError:
                 self.parser.print_usage()
-                self.die(f'invalid format string {shlex.quote(args.format)}')
+                self.die(f"invalid format string {shlex.quote(args.format)}")
             except subprocess.CalledProcessError:
-                self.die(f'subprocess failed while listing {project.name}')
+                self.die(f"subprocess failed while listing {project.name}")
 
             self.inf(result, colorize=False)
+
 
 class ManifestCommand(_ProjectCommand):
     # The slightly weird naming is to avoid a conflict with
@@ -523,9 +588,10 @@ class ManifestCommand(_ProjectCommand):
 
     def __init__(self):
         super(ManifestCommand, self).__init__(
-            'manifest',
-            'manage the west manifest',
-            textwrap.dedent('''\
+            "manifest",
+            "manage the west manifest",
+            textwrap.dedent(
+                """\
             Manages the west manifest.
 
             The following actions are available. You must give exactly one.
@@ -550,72 +616,90 @@ class ManifestCommand(_ProjectCommand):
             If the manifest file does not use imports, and all project
             revisions are SHAs, the --freeze and --resolve output will
             be identical after a "west update".
-            '''),
-            accepts_unknown_args=False)
+            """
+            ),
+            accepts_unknown_args=False,
+        )
 
     def do_add_parser(self, parser_adder):
         parser = self._parser(parser_adder)
 
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument('--resolve', action='store_true',
-                           help='print the manifest with all imports resolved')
-        group.add_argument('--freeze', action='store_true',
-                           help='''print the resolved manifest with SHAs for
-                           all project revisions''')
-        group.add_argument('--validate', action='store_true',
-                           help='''validate the current manifest,
-                           exiting with an error if there are issues''')
-        group.add_argument('--path', action='store_true',
-                           help="print the top level manifest file's path")
+        group.add_argument(
+            "--resolve",
+            action="store_true",
+            help="print the manifest with all imports resolved",
+        )
+        group.add_argument(
+            "--freeze",
+            action="store_true",
+            help="""print the resolved manifest with SHAs for
+                           all project revisions""",
+        )
+        group.add_argument(
+            "--validate",
+            action="store_true",
+            help="""validate the current manifest,
+                           exiting with an error if there are issues""",
+        )
+        group.add_argument(
+            "--path",
+            action="store_true",
+            help="print the top level manifest file's path",
+        )
 
-        group = parser.add_argument_group('options for --resolve and --freeze')
-        group.add_argument('-o', '--out',
-                           help='output file, default is standard output')
+        group = parser.add_argument_group("options for --resolve and --freeze")
+        group.add_argument(
+            "-o", "--out", help="output file, default is standard output"
+        )
 
         return parser
 
     def do_run(self, args, user_args):
         manifest = self.manifest
-        dump_kwargs = {'default_flow_style': False,
-                       'sort_keys': False}
+        dump_kwargs = {"default_flow_style": False, "sort_keys": False}
 
         if args.validate:
-            pass              # nothing more to do
+            pass  # nothing more to do
         elif args.resolve:
-            self._die_if_manifest_project_filter('resolve')
+            self._die_if_manifest_project_filter("resolve")
             self._dump(args, manifest.as_yaml(**dump_kwargs))
         elif args.freeze:
-            self._die_if_manifest_project_filter('freeze')
+            self._die_if_manifest_project_filter("freeze")
             self._dump(args, manifest.as_frozen_yaml(**dump_kwargs))
         elif args.path:
             self.inf(manifest.path)
         else:
             # Can't happen.
-            raise RuntimeError(f'internal error: unhandled args {args}')
+            raise RuntimeError(f"internal error: unhandled args {args}")
 
     def _die_if_manifest_project_filter(self, action):
-        if self.config.get('manifest.project-filter') is not None:
-            self.die(f'"west manifest --{action}" is not (yet) supported '
-                     'when the manifest.project-filter option is set. '
-                     'Please clear the project-filter configuration '
-                     'option and re-run this command, or contact the '
-                     'west developers if you have a use case for resolving '
-                     'the manifest while projects are made inactive by the '
-                     'project filter.')
+        if self.config.get("manifest.project-filter") is not None:
+            self.die(
+                f'"west manifest --{action}" is not (yet) supported '
+                "when the manifest.project-filter option is set. "
+                "Please clear the project-filter configuration "
+                "option and re-run this command, or contact the "
+                "west developers if you have a use case for resolving "
+                "the manifest while projects are made inactive by the "
+                "project filter."
+            )
 
     def _dump(self, args, to_dump):
         if args.out:
-            with open(args.out, 'w') as f:
+            with open(args.out, "w") as f:
                 f.write(to_dump)
         else:
             sys.stdout.write(to_dump)
 
+
 class Compare(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'compare',
+            "compare",
             "compare project status against the manifest",
-            textwrap.dedent('''\
+            textwrap.dedent(
+                """\
             Compare each project's working tree state against the results
             of the most recent successful "west update" command.
 
@@ -636,43 +720,61 @@ class Compare(_ProjectCommand):
 
             The output is meant to be human-readable, and may change. It is
             not a stable interface to write scripts against. This command
-            requires git 2.22 or later.''')
+            requires git 2.22 or later."""
+            ),
         )
 
     def do_add_parser(self, parser_adder):
-        parser = self._parser(parser_adder,
-                              epilog=ACTIVE_CLONED_PROJECTS_HELP)
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            defaults to active cloned projects''')
-        parser.add_argument('-a', '--all', action='store_true',
-                            help='include output for inactive projects')
-        parser.add_argument('--exit-code', action='store_true',
-                            help='''exit with status code 1 if status output
-                            was printed for any project''')
-        parser.add_argument('--ignore-branches',
-                            default=None, action='store_true',
-                            help='''skip output for projects with checked out
+        parser = self._parser(parser_adder, epilog=ACTIVE_CLONED_PROJECTS_HELP)
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            defaults to active cloned projects""",
+        )
+        parser.add_argument(
+            "-a",
+            "--all",
+            action="store_true",
+            help="include output for inactive projects",
+        )
+        parser.add_argument(
+            "--exit-code",
+            action="store_true",
+            help="""exit with status code 1 if status output
+                            was printed for any project""",
+        )
+        parser.add_argument(
+            "--ignore-branches",
+            default=None,
+            action="store_true",
+            help='''skip output for projects with checked out
                             branches and clean working trees if the branch is
-                            at the same commit as the last "west update"''')
-        parser.add_argument('--no-ignore-branches', dest='ignore_branches',
-                            action='store_false',
-                            help='''overrides a previous --ignore-branches
+                            at the same commit as the last "west update"''',
+        )
+        parser.add_argument(
+            "--no-ignore-branches",
+            dest="ignore_branches",
+            action="store_false",
+            help="""overrides a previous --ignore-branches
                             or any compare.ignore-branches configuration
-                            option''')
+                            option""",
+        )
         return parser
 
     def do_run(self, args, ignored):
         self.die_if_no_git()
         if self.git_version_info < (2, 22):
             # This is for git branch --show-current.
-            self.die('git version 2.22 or later is required')
+            self.die("git version 2.22 or later is required")
 
         if args.ignore_branches is not None:
             self.ignore_branches = args.ignore_branches
         else:
-            self.ignore_branches = \
-                self.config.getboolean('compare.ignore-branches', False)
+            self.ignore_branches = self.config.getboolean(
+                "compare.ignore-branches", False
+            )
 
         failed = []
         printed_output = False
@@ -706,16 +808,21 @@ class Compare(_ProjectCommand):
                 if self.ignore_branches:
                     return False
 
-                return bool(project.git(['branch', '--show-current'],
-                                        capture_stdout=True,
-                                        capture_stderr=True).stdout.strip())
+                return bool(
+                    project.git(
+                        ["branch", "--show-current"],
+                        capture_stdout=True,
+                        capture_stderr=True,
+                    ).stdout.strip()
+                )
 
             try:
-                if not (self.verbosity >= Verbosity.DBG or
-                        has_checked_out_branch(project) or
-                        (project.sha(QUAL_MANIFEST_REV) !=
-                         project.sha('HEAD')) or
-                        self._has_nonempty_status(project)):
+                if not (
+                    self.verbosity >= Verbosity.DBG
+                    or has_checked_out_branch(project)
+                    or (project.sha(QUAL_MANIFEST_REV) != project.sha("HEAD"))
+                    or self._has_nonempty_status(project)
+                ):
                     continue
 
                 self.compare(project)
@@ -728,7 +835,7 @@ class Compare(_ProjectCommand):
             raise CommandError(1)
 
     def compare(self, project):
-        self.banner(f'{project.name_and_path}:')
+        self.banner(f"{project.name_and_path}:")
         self.print_rev_info(project)
         self.print_status(project)
 
@@ -742,51 +849,70 @@ class Compare(_ProjectCommand):
             return
 
         def rev_info(rev):
-            title = project.git(
-                ['log', '-1', '--color=never', '--pretty=%h%d %s',
-                 '--decorate-refs-exclude=refs/heads/manifest-rev',
-                 rev],
-                capture_stdout=True,
-                capture_stderr=True).stdout.decode().rstrip()
+            title = (
+                project.git(
+                    [
+                        "log",
+                        "-1",
+                        "--color=never",
+                        "--pretty=%h%d %s",
+                        "--decorate-refs-exclude=refs/heads/manifest-rev",
+                        rev,
+                    ],
+                    capture_stdout=True,
+                    capture_stderr=True,
+                )
+                .stdout.decode()
+                .rstrip()
+            )
             # "HEAD" is special; '--decorate-refs-exclude=HEAD' doesn't work.
             # Fortunately it's always first.
             return (
-                title.replace('(HEAD) ', '').replace('(HEAD, ', '(')
-                .replace('(HEAD -> ', '(')
+                title.replace("(HEAD) ", "")
+                .replace("(HEAD, ", "(")
+                .replace("(HEAD -> ", "(")
             )
 
-        head_info = rev_info('HEAD')
+        head_info = rev_info("HEAD")
         # If manifest-rev is missing, we already failed earlier.
-        manifest_rev_info = rev_info('manifest-rev')
-        self.small_banner(f'manifest-rev: {manifest_rev_info}')
-        self.inf(f'            HEAD: {head_info}')
+        manifest_rev_info = rev_info("manifest-rev")
+        self.small_banner(f"manifest-rev: {manifest_rev_info}")
+        self.inf(f"            HEAD: {head_info}")
 
     def print_status(self, project):
         # `git status` shows `manifest-rev` "sometimes", see #643.
         if self.color_ui:
-            color = '-c status.color=always'
+            color = "-c status.color=always"
         else:
-            color = ''
-        cp = project.git(f'{color} status', capture_stdout=True,
-                         capture_stderr=True)
-        self.small_banner('status:')
-        self.inf(textwrap.indent(cp.stdout.decode().rstrip(), ' ' * 4))
+            color = ""
+        cp = project.git(f"{color} status", capture_stdout=True, capture_stderr=True)
+        self.small_banner("status:")
+        self.inf(textwrap.indent(cp.stdout.decode().rstrip(), " " * 4))
+
 
 class Diff(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'diff',
+            "diff",
             '"git diff" for one or more projects',
-            'Runs "git diff" on each of the specified projects.')
+            'Runs "git diff" on each of the specified projects.',
+        )
 
     def do_add_parser(self, parser_adder):
-        parser = self._parser(parser_adder,
-                              epilog=ACTIVE_CLONED_PROJECTS_HELP)
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            defaults to active cloned projects''')
-        parser.add_argument('-a', '--all', action='store_true',
-                            help='include output for inactive projects')
+        parser = self._parser(parser_adder, epilog=ACTIVE_CLONED_PROJECTS_HELP)
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            defaults to active cloned projects""",
+        )
+        parser.add_argument(
+            "-a",
+            "--all",
+            action="store_true",
+            help="include output for inactive projects",
+        )
         return parser
 
     def do_run(self, args, ignored):
@@ -796,20 +922,27 @@ class Diff(_ProjectCommand):
         no_diff = 0
         # We may need to force git to use colors if the user wants them,
         # which it won't do ordinarily since stdout is not a terminal.
-        color = ['--color=always'] if self.color_ui else []
+        color = ["--color=always"] if self.color_ui else []
         for project in self._cloned_projects(args, only_active=not args.all):
             # Use paths that are relative to the base directory to make it
             # easier to see where the changes are
-            cp = project.git(['diff', f'--src-prefix={project.path}/',
-                              f'--dst-prefix={project.path}/',
-                              '--exit-code'] + color,
-                             capture_stdout=True, capture_stderr=True,
-                             check=False)
+            cp = project.git(
+                [
+                    "diff",
+                    f"--src-prefix={project.path}/",
+                    f"--dst-prefix={project.path}/",
+                    "--exit-code",
+                ]
+                + color,
+                capture_stdout=True,
+                capture_stderr=True,
+                check=False,
+            )
             if cp.returncode == 0:
                 no_diff += 1
             if cp.returncode == 1 or self.verbosity >= Verbosity.DBG:
-                self.banner(f'diff for {project.name_and_path}:')
-                self.inf(cp.stdout.decode('utf-8'))
+                self.banner(f"diff for {project.name_and_path}:")
+                self.inf(cp.stdout.decode("utf-8"))
             elif cp.returncode:
                 failed.append(project)
         if failed:
@@ -817,21 +950,30 @@ class Diff(_ProjectCommand):
         elif self.verbosity <= Verbosity.INF:
             self.inf(f"Empty diff in {no_diff} projects.")
 
+
 class Status(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'status',
+            "status",
             '"git status" for one or more projects',
-            "Runs 'git status' for each of the specified projects.")
+            "Runs 'git status' for each of the specified projects.",
+        )
 
     def do_add_parser(self, parser_adder):
-        parser = self._parser(parser_adder,
-                              epilog=ACTIVE_CLONED_PROJECTS_HELP)
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            defaults to active cloned projects''')
-        parser.add_argument('-a', '--all', action='store_true',
-                            help='include output for inactive projects')
+        parser = self._parser(parser_adder, epilog=ACTIVE_CLONED_PROJECTS_HELP)
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            defaults to active cloned projects""",
+        )
+        parser.add_argument(
+            "-a",
+            "--all",
+            action="store_true",
+            help="include output for inactive projects",
+        )
         return parser
 
     def do_run(self, args, user_args):
@@ -853,23 +995,27 @@ class Status(_ProjectCommand):
             # In verbose mode, we always print output.
 
             try:
-                if not (self.verbosity >= Verbosity.DBG or
-                        self._has_nonempty_status(project)):
+                if not (
+                    self.verbosity >= Verbosity.DBG
+                    or self._has_nonempty_status(project)
+                ):
                     continue
 
-                self.banner(f'status of {project.name_and_path}:')
-                project.git('status', extra_args=user_args)
+                self.banner(f"status of {project.name_and_path}:")
+                project.git("status", extra_args=user_args)
             except subprocess.CalledProcessError:
                 failed.append(project)
         self._handle_failed(args, failed)
+
 
 class Update(_ProjectCommand):
 
     def __init__(self):
         super().__init__(
-            'update',
-            'update projects described in west manifest',
-            textwrap.dedent('''\
+            "update",
+            "update projects described in west manifest",
+            textwrap.dedent(
+                """\
             Updates active projects defined in the manifest file as follows:
 
             1. Clone the project if necessary
@@ -882,82 +1028,134 @@ class Update(_ProjectCommand):
 
             You must have already created a west workspace with "west init".
 
-            This command does not alter the manifest repository's contents.''')
+            This command does not alter the manifest repository's contents."""
+            ),
         )
 
     def do_add_parser(self, parser_adder):
         parser = self._parser(parser_adder)
 
-        parser.add_argument('--stats', action='store_true',
-                            help='''print performance statistics for
-                            update operations''')
+        parser.add_argument(
+            "--stats",
+            action="store_true",
+            help="""print performance statistics for
+                            update operations""",
+        )
 
         group = parser.add_argument_group(
-            title='local project clone caches',
-            description=textwrap.dedent('''\
+            title="local project clone caches",
+            description=textwrap.dedent(
+                """\
             Projects are usually initialized by fetching from their URLs, but
-            they can also be cloned from caches on the local file system.'''))
-        group.add_argument('--name-cache',
-                           help='''cached repositories are in subdirectories
-                           matching the names of projects to update''')
-        group.add_argument('--path-cache',
-                           help='''cached repositories are in the same relative
-                           paths as the workspace being updated''')
+            they can also be cloned from caches on the local file system."""
+            ),
+        )
+        group.add_argument(
+            "--name-cache",
+            help="""cached repositories are in subdirectories
+                           matching the names of projects to update""",
+        )
+        group.add_argument(
+            "--path-cache",
+            help="""cached repositories are in the same relative
+                           paths as the workspace being updated""",
+        )
 
         group = parser.add_argument_group(
-            title='fetching behavior',
-            description='By default, west update tries to avoid fetching.')
-        group.add_argument('-f', '--fetch', dest='fetch_strategy',
-                           choices=['always', 'smart'],
-                           help='''how to fetch projects when updating:
+            title="fetching behavior",
+            description="By default, west update tries to avoid fetching.",
+        )
+        group.add_argument(
+            "-f",
+            "--fetch",
+            dest="fetch_strategy",
+            choices=["always", "smart"],
+            help="""how to fetch projects when updating:
                            "always" fetches every project before update,
                            while "smart" (default) skips fetching projects
                            whose revisions are SHAs or tags available
-                           locally''')
-        group.add_argument('-o', '--fetch-opt', action='append', default=[],
-                           help='''additional option to pass to 'git fetch'
+                           locally""",
+        )
+        group.add_argument(
+            "-o",
+            "--fetch-opt",
+            action="append",
+            default=[],
+            help="""additional option to pass to 'git fetch'
                            if fetching is necessary (e.g. 'o=--depth=1');
-                           may be given more than once''')
-        group.add_argument('-n', '--narrow', action='store_true',
-                           help='''fetch just the project revision if fetching
+                           may be given more than once""",
+        )
+        group.add_argument(
+            "-n",
+            "--narrow",
+            action="store_true",
+            help="""fetch just the project revision if fetching
                            is necessary; do not pass --tags to git fetch
                            (may not work for SHA revisions depending on the Git
-                           host)''')
+                           host)""",
+        )
 
         group = parser.add_argument_group(
-            title='checked out branch behavior',
-            description=textwrap.dedent('''\
+            title="checked out branch behavior",
+            description=textwrap.dedent(
+                """\
             By default, locally checked out branches are left behind
-            when manifest-rev commits are checked out.'''))
-        group.add_argument('-k', '--keep-descendants', action='store_true',
-                           help='''if a checked out branch is a descendant
+            when manifest-rev commits are checked out."""
+            ),
+        )
+        group.add_argument(
+            "-k",
+            "--keep-descendants",
+            action="store_true",
+            help="""if a checked out branch is a descendant
                            of the new manifest-rev, leave it checked out
-                           instead (takes priority over --rebase)''')
-        group.add_argument('-r', '--rebase', action='store_true',
-                           help='''rebase any checked out branch onto the new
+                           instead (takes priority over --rebase)""",
+        )
+        group.add_argument(
+            "-r",
+            "--rebase",
+            action="store_true",
+            help="""rebase any checked out branch onto the new
                            manifest-rev instead (leaving behind partial
-                           rebases on error)''')
+                           rebases on error)""",
+        )
 
-        group = parser.add_argument_group(
-            title='advanced options')
-        group.add_argument('--group-filter', '--gf', action='append',
-                           default=[], metavar='FILTER', dest='group_filter',
-                           help='''proceed as if FILTER was appended to
+        group = parser.add_argument_group(title="advanced options")
+        group.add_argument(
+            "--group-filter",
+            "--gf",
+            action="append",
+            default=[],
+            metavar="FILTER",
+            dest="group_filter",
+            help="""proceed as if FILTER was appended to
                            manifest.group-filter; may be given multiple
-                           times''')
-        group.add_argument('--submodule-init-config',
-                           action='append', default=[],
-                           help='''git configuration option to set when running
+                           times""",
+        )
+        group.add_argument(
+            "--submodule-init-config",
+            action="append",
+            default=[],
+            help="""git configuration option to set when running
                            'git submodule init' in '<option>=<value>' format;
-                           may be given more than once''')
+                           may be given more than once""",
+        )
 
-        group = parser.add_argument_group('deprecated options')
-        group.add_argument('-x', '--exclude-west', action='store_true',
-                           help='ignored for backwards compatibility')
+        group = parser.add_argument_group("deprecated options")
+        group.add_argument(
+            "-x",
+            "--exclude-west",
+            action="store_true",
+            help="ignored for backwards compatibility",
+        )
 
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            defaults to all active projects''')
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            defaults to all active projects""",
+        )
 
         return parser
 
@@ -979,30 +1177,32 @@ class Update(_ProjectCommand):
 
         self.args = args
         if args.exclude_west:
-            self.wrn('ignoring --exclude-west')
+            self.wrn("ignoring --exclude-west")
 
         config = self.config
-        self.narrow = args.narrow or config.getboolean('update.narrow')
-        self.path_cache = args.path_cache or config.get('update.path-cache')
-        self.name_cache = args.name_cache or config.get('update.name-cache')
-        self.sync_submodules = config.getboolean('update.sync-submodules',
-                                                 default=True)
+        self.narrow = args.narrow or config.getboolean("update.narrow")
+        self.path_cache = args.path_cache or config.get("update.path-cache")
+        self.name_cache = args.name_cache or config.get("update.name-cache")
+        self.sync_submodules = config.getboolean("update.sync-submodules", default=True)
 
         self.group_filter: List[str] = []
 
         def handle(group_filter_item):
             item = group_filter_item.strip()
-            if not item.startswith(('-', '+')):
-                self.die(f'invalid --group-filter item {item}: '
-                         'must start with - or +')
+            if not item.startswith(("-", "+")):
+                self.die(
+                    f"invalid --group-filter item {item}: " "must start with - or +"
+                )
             if not is_project_group(item[1:]):
-                self.die(f'invalid --group-filter item {item}: '
-                         f'"{item[1:]}" is not a valid group name')
+                self.die(
+                    f"invalid --group-filter item {item}: "
+                    f'"{item[1:]}" is not a valid group name'
+                )
             self.group_filter.append(item)
 
         for item in args.group_filter:
-            if ',' in item:
-                for split_item in item.split(','):
+            if "," in item:
+                for split_item in item.split(","):
                     handle(split_item)
             else:
                 handle(item)
@@ -1022,17 +1222,16 @@ class Update(_ProjectCommand):
         self.updated = set()
 
         self.manifest = Manifest.from_file(
-            importer=self.update_importer,
-            import_flags=ImportFlag.FORCE_PROJECTS)
+            importer=self.update_importer, import_flags=ImportFlag.FORCE_PROJECTS
+        )
 
         failed = []
         for project in self.manifest.projects:
-            if (isinstance(project, ManifestProject) or
-                    project.name in self.updated):
+            if isinstance(project, ManifestProject) or project.name in self.updated:
                 continue
             try:
                 if not self.project_is_active(project):
-                    self.dbg(f'{project.name}: skipping inactive project')
+                    self.dbg(f"{project.name}: skipping inactive project")
                     continue
                 self.update(project)
                 self.updated.add(project.name)
@@ -1066,16 +1265,17 @@ class Update(_ProjectCommand):
             name = project.name
             sha = project.sha(QUAL_MANIFEST_REV)
             if self.verbosity < Verbosity.DBG_EXTREME:
-                suggest_vvv = ('\n'
-                               '        Use "west -vvv update" to debug.')
+                suggest_vvv = "\n" '        Use "west -vvv update" to debug.'
             else:
-                suggest_vvv = ''
-            self.die(f"can't import from project {name}\n"
-                     f'  Expected to import from {path} at revision {sha}\n'
-                     f'  Hint: possible manifest file fixes for {name}:\n'
-                     f'          - set "revision:" to a git ref with this '
-                     f'file at URL {project.url}\n'
-                     '          - remove the "import:"' + suggest_vvv)
+                suggest_vvv = ""
+            self.die(
+                f"can't import from project {name}\n"
+                f"  Expected to import from {path} at revision {sha}\n"
+                f"  Hint: possible manifest file fixes for {name}:\n"
+                f'          - set "revision:" to a git ref with this '
+                f"file at URL {project.url}\n"
+                '          - remove the "import:"' + suggest_vvv
+            )
 
     def update_some(self):
         # The 'west update PROJECT [...]' style invocation is only
@@ -1117,8 +1317,7 @@ class Update(_ProjectCommand):
         ids = self.args.projects
         assert ids
 
-        self.manifest = Manifest.from_file(
-            import_flags=ImportFlag.IGNORE_PROJECTS)
+        self.manifest = Manifest.from_file(import_flags=ImportFlag.IGNORE_PROJECTS)
         mr_projects, mr_unknown = projects_unknown(self.manifest, ids)
         if not mr_unknown:
             return mr_projects
@@ -1126,8 +1325,10 @@ class Update(_ProjectCommand):
         try:
             self.manifest = Manifest.from_file()
         except ManifestImportFailed:
-            self.die('one or more projects are unknown or defined via '
-                     'imports; please run plain "west update".')
+            self.die(
+                "one or more projects are unknown or defined via "
+                'imports; please run plain "west update".'
+            )
 
         _, unknown = projects_unknown(self.manifest, ids)
         if unknown:
@@ -1137,23 +1338,27 @@ class Update(_ProjectCommand):
             # are not defined in the manifest repository.
             mr_unknown_set = set(mr_unknown)
             from_projects = [p for p in ids if p in mr_unknown_set]
-            self.die('refusing to update project: ' +
-                     " ".join(from_projects) + '\n' +
-                     '  It or they were resolved via project imports.\n'
-                     '  Only plain "west update" can currently update them.')
+            self.die(
+                "refusing to update project: "
+                + " ".join(from_projects)
+                + "\n"
+                + "  It or they were resolved via project imports.\n"
+                '  Only plain "west update" can currently update them.'
+            )
 
     def fetch_strategy(self):
-        cfg = self.config.get('update.fetch')
-        if cfg is not None and cfg not in ('always', 'smart'):
-            self.wrn(f'ignoring invalid config update.fetch={cfg}; '
-                     'choices: always, smart')
+        cfg = self.config.get("update.fetch")
+        if cfg is not None and cfg not in ("always", "smart"):
+            self.wrn(
+                f"ignoring invalid config update.fetch={cfg}; " "choices: always, smart"
+            )
             cfg = None
         if self.args.fetch_strategy:
             return self.args.fetch_strategy
         elif cfg:
             return cfg
         else:
-            return 'smart'
+            return "smart"
 
     def update_submodules(self, project):
         # Updates given project submodules by using
@@ -1163,49 +1368,64 @@ class Update(_ProjectCommand):
             return
 
         submodules = project.submodules
-        submodules_update_strategy = ('--rebase' if self.args.rebase
-                                      else '--checkout')
+        submodules_update_strategy = "--rebase" if self.args.rebase else "--checkout"
         config_opts = []
         for config_opt in self.args.submodule_init_config:
-            config_opts.extend(['-c', config_opt])
+            config_opts.extend(["-c", config_opt])
 
         cache_dir = self.project_cache(project)
         # For the boolean type, update all the submodules.
         if isinstance(submodules, bool):
             if cache_dir is None:
                 if self.sync_submodules:
-                    project.git(['submodule', 'sync', '--recursive'])
-                project.git(config_opts +
-                            ['submodule', 'update', '--init',
-                                submodules_update_strategy, '--recursive'])
+                    project.git(["submodule", "sync", "--recursive"])
+                project.git(
+                    config_opts
+                    + [
+                        "submodule",
+                        "update",
+                        "--init",
+                        submodules_update_strategy,
+                        "--recursive",
+                    ]
+                )
                 return
             else:
                 # Cache used so convert to a list so that --reference can be used.
-                res = project.git(['submodule', 'status'], capture_stdout=True)
+                res = project.git(["submodule", "status"], capture_stdout=True)
                 if not res.stdout or res.returncode:
-                    self.die(
-                        f"Submodule status failed for project: {project.name}.")
-                mod_list = [s.strip() for s in res.stdout.decode('utf-8').split('\n') if s]
-                submodules = [Submodule(line.split(' ')[1]) for line in mod_list]
+                    self.die(f"Submodule status failed for project: {project.name}.")
+                mod_list = [
+                    s.strip() for s in res.stdout.decode("utf-8").split("\n") if s
+                ]
+                submodules = [Submodule(line.split(" ")[1]) for line in mod_list]
 
         # For the list type, update given list of submodules.
         for submodule in submodules:
             if self.sync_submodules:
-                project.git(['submodule', 'sync', '--recursive',
-                             '--', submodule.path])
+                project.git(["submodule", "sync", "--recursive", "--", submodule.path])
             ref = []
-            if (cache_dir):
+            if cache_dir:
                 submodule_ref = Path(cache_dir, submodule.path)
                 if any(os.scandir(submodule_ref)):
-                    ref = ['--reference', os.fspath(submodule_ref)]
-                    self.small_banner(f'using reference from: {submodule_ref}')
+                    ref = ["--reference", os.fspath(submodule_ref)]
+                    self.small_banner(f"using reference from: {submodule_ref}")
                     self.dbg(
-                        f'found {submodule.path} in --path-cache {submodule_ref}',
-                        level=Verbosity.DBG_MORE)
-            project.git(config_opts +
-                        ['submodule', 'update',
-                            '--init', submodules_update_strategy,
-                            '--recursive'] + ref + [submodule.path])
+                        f"found {submodule.path} in --path-cache {submodule_ref}",
+                        level=Verbosity.DBG_MORE,
+                    )
+            project.git(
+                config_opts
+                + [
+                    "submodule",
+                    "update",
+                    "--init",
+                    submodules_update_strategy,
+                    "--recursive",
+                ]
+                + ref
+                + [submodule.path]
+            )
 
     def update(self, project):
         if self.args.stats:
@@ -1215,7 +1435,7 @@ class Update(_ProjectCommand):
             stats = None
         take_stats = stats is not None
 
-        self.banner(f'updating {project.name_and_path}:')
+        self.banner(f"updating {project.name_and_path}:")
 
         # Make sure we've got a project to work with.
         self.ensure_cloned(project, stats, take_stats)
@@ -1240,61 +1460,63 @@ class Update(_ProjectCommand):
         # and --keep-descendants options, decide what we need to do
         # now.
         current_branch, is_ancestor, try_rebase = self.decide_update_strategy(
-            project, sha, stats, take_stats)
+            project, sha, stats, take_stats
+        )
 
         # Finish the update. This may be a nop if we're keeping
         # descendants.
         if self.args.keep_descendants and is_ancestor:
             # A descendant is currently checked out and keep_descendants was
             # given, so there's nothing more to do.
-            self.inf(f'west update: left descendant branch '
-                     f'"{current_branch}" checked out; current status:')
+            self.inf(
+                f"west update: left descendant branch "
+                f'"{current_branch}" checked out; current status:'
+            )
             if take_stats:
                 start = perf_counter()
-            project.git('status')
+            project.git("status")
             if take_stats:
-                stats['get current status'] = perf_counter - start
+                stats["get current status"] = perf_counter - start
         elif try_rebase:
             # Attempt a rebase.
-            self.inf(f'west update: rebasing to {MANIFEST_REV} {sha}')
+            self.inf(f"west update: rebasing to {MANIFEST_REV} {sha}")
             if take_stats:
                 start = perf_counter()
-            project.git('rebase ' + QUAL_MANIFEST_REV)
+            project.git("rebase " + QUAL_MANIFEST_REV)
             if take_stats:
-                stats['rebase onto new manifest-rev'] = perf_counter() - start
+                stats["rebase onto new manifest-rev"] = perf_counter() - start
         else:
             # We can't keep a descendant or rebase, so just check
             # out the new detached HEAD, then print some helpful context.
             if take_stats:
                 start = perf_counter()
-            project.git(['checkout', '--detach', sha])
+            project.git(["checkout", "--detach", sha])
             if take_stats:
-                stats['checkout new manifest-rev'] = perf_counter() - start
-            self.post_checkout_help(project, current_branch,
-                                    sha, is_ancestor)
+                stats["checkout new manifest-rev"] = perf_counter() - start
+            self.post_checkout_help(project, current_branch, sha, is_ancestor)
 
         # Update project submodules, if it has any.
         if take_stats:
             start = perf_counter()
         self.update_submodules(project)
         if take_stats:
-            stats['update submodules'] = perf_counter() - start
+            stats["update submodules"] = perf_counter() - start
 
         # Print performance statistics.
         if take_stats:
             update_total = perf_counter() - update_start
             slop = update_total - sum(stats.values())
-            stats['other work'] = slop
-            stats['TOTAL'] = update_total
-            self.inf('performance statistics:')
+            stats["other work"] = slop
+            stats["TOTAL"] = update_total
+            self.inf("performance statistics:")
             for stat, value in stats.items():
-                self.inf(f'  {stat}: {value} sec')
+                self.inf(f"  {stat}: {value} sec")
 
     def post_checkout_help(self, project, branch, sha, is_ancestor):
         # Print helpful information to the user about a project that
         # might have just left a branch behind.
 
-        if branch == 'HEAD':
+        if branch == "HEAD":
             # If there was no branch checked out, there are no
             # additional diagnostics that need emitting.
             return
@@ -1306,19 +1528,27 @@ class Update(_ProjectCommand):
             # user is working on and the remote hasn't changed),
             # print a message that makes it easy to get back,
             # no matter where in the workspace os.getcwd() is.
-            self.wrn(f'left behind {project.name} branch "{branch}"; '
-                     f'to switch back to it (fast forward):\n'
-                     f'  git -C {rel} checkout {branch}')
-            self.dbg('(To do this automatically in the future,',
-                     'use "west update --keep-descendants".)')
+            self.wrn(
+                f'left behind {project.name} branch "{branch}"; '
+                f"to switch back to it (fast forward):\n"
+                f"  git -C {rel} checkout {branch}"
+            )
+            self.dbg(
+                "(To do this automatically in the future,",
+                'use "west update --keep-descendants".)',
+            )
         else:
             # Tell the user how they could rebase by hand, and
             # point them at west update --rebase.
-            self.wrn(f'left behind {project.name} branch "{branch}"; '
-                     f'to rebase onto the new HEAD:\n'
-                     f'  git -C {rel} rebase {sha} {branch}')
-            self.dbg('(To do this automatically in the future,',
-                     'use "west update --rebase".)')
+            self.wrn(
+                f'left behind {project.name} branch "{branch}"; '
+                f"to rebase onto the new HEAD:\n"
+                f"  git -C {rel} rebase {sha} {branch}"
+            )
+            self.dbg(
+                "(To do this automatically in the future,",
+                'use "west update --rebase".)',
+            )
 
     def ensure_cloned(self, project, stats, take_stats):
         # update() helper. Make sure project is cloned and initialized.
@@ -1327,13 +1557,13 @@ class Update(_ProjectCommand):
             start = perf_counter()
         cloned = project.is_cloned()
         if take_stats:
-            stats['check if cloned'] = perf_counter() - start
+            stats["check if cloned"] = perf_counter() - start
         if not cloned:
             if take_stats:
                 start = perf_counter()
             self.init_project(project)
             if take_stats:
-                stats['init'] = perf_counter() - start
+                stats["init"] = perf_counter() - start
 
     def init_project(self, project):
         # update() helper. Initialize an uncloned project repository.
@@ -1344,41 +1574,47 @@ class Update(_ProjectCommand):
         cache_dir = self.project_cache(project)
 
         if cache_dir is None:
-            self.small_banner(f'{project.name}: initializing')
+            self.small_banner(f"{project.name}: initializing")
 
-            init_cmd = ['init', project.abspath]
+            init_cmd = ["init", project.abspath]
             # Silence the very verbose and repetitive init.defaultBranch
             # warning (10 lines per new git clone). The branch
             # 'placeholder' will never have any commit so it will never
             # actually exist.
             if self.git_version_info >= (2, 28, 0):
-                init_cmd.insert(1, '--initial-branch=init_placeholder')
+                init_cmd.insert(1, "--initial-branch=init_placeholder")
 
             project.git(init_cmd, cwd=self.topdir)
 
             # This remote is added as a convenience for the user.
             # However, west always fetches project data by URL, not name.
             # The user is therefore free to change the URL of this remote.
-            project.git(['remote', 'add', '--', project.remote_name, project.url])
+            project.git(["remote", "add", "--", project.remote_name, project.url])
         else:
-            self.small_banner(f'{project.name}: cloning from {cache_dir}')
+            self.small_banner(f"{project.name}: cloning from {cache_dir}")
             # Clone the project from a local cache repository. Set the
             # remote name to the value that would be used without a
             # cache.
-            project.git(['clone', '--origin', project.remote_name,
-                         cache_dir, project.abspath], cwd=self.topdir)
+            project.git(
+                ["clone", "--origin", project.remote_name, cache_dir, project.abspath],
+                cwd=self.topdir,
+            )
             # Reset the remote's URL to the project's fetch URL.
-            project.git(['remote', 'set-url', project.remote_name,
-                         project.url])
+            project.git(["remote", "set-url", project.remote_name, project.url])
             # Make sure we have a detached HEAD so we can delete the
             # local branch created by git clone.
-            project.git('checkout --quiet --detach HEAD')
+            project.git("checkout --quiet --detach HEAD")
             # Find the name of any local branch created by git clone.
             # West commits to only touching 'manifest-rev' in the
             # local branch name space.
-            local_branches = project.git(
-                ['for-each-ref', '--format', '%(refname)', 'refs/heads/*'],
-                capture_stdout=True).stdout.decode('utf-8').splitlines()
+            local_branches = (
+                project.git(
+                    ["for-each-ref", "--format", "%(refname)", "refs/heads/*"],
+                    capture_stdout=True,
+                )
+                .stdout.decode("utf-8")
+                .splitlines()
+            )
             # This should contain at most one branch in current
             # versions of git, but we might as well get them all just
             # in case that changes.
@@ -1388,7 +1624,7 @@ class Update(_ProjectCommand):
                 # This is safe: it can't be garbage collected by git before we
                 # have a chance to use it, because we have another ref, namely
                 # f'refs/remotes/{project.remote_name}/{branch}'.
-                project.git(['update-ref', '-d', branch])
+                project.git(["update-ref", "-d", branch])
 
     def project_cache(self, project):
         # Find the absolute path to a pre-existing local clone of a project
@@ -1398,24 +1634,28 @@ class Update(_ProjectCommand):
             maybe = Path(self.name_cache) / project.name
             if maybe.is_dir():
                 self.dbg(
-                    f'found {project.name} in --name-cache {self.name_cache}',
-                    level=Verbosity.DBG_MORE)
+                    f"found {project.name} in --name-cache {self.name_cache}",
+                    level=Verbosity.DBG_MORE,
+                )
                 return os.fspath(maybe)
             else:
                 self.dbg(
-                    f'{project.name} not in --name-cache {self.name_cache}',
-                    level=Verbosity.DBG_MORE)
+                    f"{project.name} not in --name-cache {self.name_cache}",
+                    level=Verbosity.DBG_MORE,
+                )
         elif self.path_cache is not None:
             maybe = Path(self.path_cache) / project.path
             if maybe.is_dir():
                 self.dbg(
-                    f'found {project.path} in --path-cache {self.path_cache}',
-                    level=Verbosity.DBG_MORE)
+                    f"found {project.path} in --path-cache {self.path_cache}",
+                    level=Verbosity.DBG_MORE,
+                )
                 return os.fspath(maybe)
             else:
                 self.dbg(
-                    f'{project.path} not in --path-cache {self.path_cache}',
-                    level=Verbosity.DBG_MORE)
+                    f"{project.path} not in --path-cache {self.path_cache}",
+                    level=Verbosity.DBG_MORE,
+                )
 
         return None
 
@@ -1423,15 +1663,15 @@ class Update(_ProjectCommand):
         # update() helper. Make sure project's manifest-rev is set to
         # the latest value it should be.
 
-        if self.fs == 'always' or _rev_type(project) not in ('tag', 'commit'):
+        if self.fs == "always" or _rev_type(project) not in ("tag", "commit"):
             self.fetch(project, stats, take_stats)
         else:
-            self.dbg('skipping unnecessary fetch')
+            self.dbg("skipping unnecessary fetch")
             if take_stats:
                 start = perf_counter()
-            _update_manifest_rev(project, f'{project.revision}^{{commit}}')
+            _update_manifest_rev(project, f"{project.revision}^{{commit}}")
             if take_stats:
-                stats['set manifest-rev'] = perf_counter() - start
+                stats["set manifest-rev"] = perf_counter() - start
 
     def fetch(self, project, stats, take_stats):
         # Fetches rev (or project.revision) from project.url in a way that
@@ -1459,7 +1699,7 @@ class Update(_ProjectCommand):
             # We can't in general fetch a SHA from a remote, as some hosts
             # forbid it for security reasons. Let's hope it's reachable
             # from some branch.
-            refspec = f'refs/heads/*:{QUAL_REFS}*'
+            refspec = f"refs/heads/*:{QUAL_REFS}*"
             next_manifest_rev = project.revision
         else:
             # Either the revision is definitely not a SHA and is
@@ -1471,23 +1711,28 @@ class Update(_ProjectCommand):
             # refspec in case the revision is a tag, which we can't use
             # from a refspec.
             refspec = project.revision
-            next_manifest_rev = 'FETCH_HEAD^{commit}'
+            next_manifest_rev = "FETCH_HEAD^{commit}"
 
-        self.small_banner(f'{project.name}: fetching, need revision {rev}')
+        self.small_banner(f"{project.name}: fetching, need revision {rev}")
         # --tags is required to get tags if we're not run as 'west
         # update --narrow', since the remote is specified as a URL.
-        tags = (['--tags'] if not self.narrow else [])
-        clone_depth = (['--depth', str(project.clone_depth)] if
-                       project.clone_depth else [])
+        tags = ["--tags"] if not self.narrow else []
+        clone_depth = (
+            ["--depth", str(project.clone_depth)] if project.clone_depth else []
+        )
         # -f is needed to avoid errors in case multiple remotes are
         # present, at least one of which contains refs that can't be
         # fast-forwarded to our local ref space.
-        project.git(['fetch', '-f'] + tags + clone_depth +
-                    self.args.fetch_opt +
-                    ['--', project.url, refspec])
+        project.git(
+            ["fetch", "-f"]
+            + tags
+            + clone_depth
+            + self.args.fetch_opt
+            + ["--", project.url, refspec]
+        )
 
         if take_stats:
-            stats['fetch'] = perf_counter() - start
+            stats["fetch"] = perf_counter() - start
 
         # Update manifest-rev, leaving an entry in the reflog.
         if take_stats:
@@ -1497,7 +1742,7 @@ class Update(_ProjectCommand):
         _update_manifest_rev(project, new_ref)
 
         if take_stats:
-            stats['set manifest-rev'] = perf_counter() - start
+            stats["set manifest-rev"] = perf_counter() - start
 
     @staticmethod
     def clean_refs_west(project, stats, take_stats):
@@ -1518,7 +1763,7 @@ class Update(_ProjectCommand):
             start = perf_counter()
         _clean_west_refspace(project)
         if take_stats:
-            stats['clean up refs/west/*'] = perf_counter() - start
+            stats["clean up refs/west/*"] = perf_counter() - start
 
     @staticmethod
     def ensure_head_ok(project, stats, take_stats):
@@ -1528,7 +1773,7 @@ class Update(_ProjectCommand):
             start = perf_counter()
         head_ok = _head_ok(project)
         if take_stats:
-            stats['check HEAD is ok'] = perf_counter() - start
+            stats["check HEAD is ok"] = perf_counter() - start
         if not head_ok:
             # If nothing is checked out (which usually only happens if
             # we called Update.init_project() above), check out
@@ -1544,9 +1789,9 @@ class Update(_ProjectCommand):
             # it avoids a spammy detached HEAD warning from Git.
             if take_stats:
                 start = perf_counter()
-            project.git('checkout --detach ' + QUAL_MANIFEST_REV)
+            project.git("checkout --detach " + QUAL_MANIFEST_REV)
             if take_stats:
-                stats['checkout new manifest-rev'] = perf_counter() - start
+                stats["checkout new manifest-rev"] = perf_counter() - start
 
     def manifest_rev_sha(self, project, stats, take_stats):
         # update() helper. Get the SHA for manifest-rev.
@@ -1556,11 +1801,13 @@ class Update(_ProjectCommand):
                 start = perf_counter()
             return project.sha(QUAL_MANIFEST_REV)
             if take_stats:
-                stats['get new manifest-rev SHA'] = perf_counter() - start
+                stats["get new manifest-rev SHA"] = perf_counter() - start
         except subprocess.CalledProcessError:
             # This is a sign something's really wrong. Add more help.
-            self.err(f'no SHA for branch {MANIFEST_REV} '
-                     f'in {project.name_and_path}; was the branch deleted?')
+            self.err(
+                f"no SHA for branch {MANIFEST_REV} "
+                f"in {project.name_and_path}; was the branch deleted?"
+            )
             raise
 
     def decide_update_strategy(self, project, sha, stats, take_stats):
@@ -1569,22 +1816,24 @@ class Update(_ProjectCommand):
 
         if take_stats:
             start = perf_counter()
-        cp = project.git('rev-parse --abbrev-ref HEAD', capture_stdout=True)
+        cp = project.git("rev-parse --abbrev-ref HEAD", capture_stdout=True)
         if take_stats:
-            stats['get current branch HEAD'] = perf_counter() - start
-        current_branch = cp.stdout.decode('utf-8').strip()
+            stats["get current branch HEAD"] = perf_counter() - start
+        current_branch = cp.stdout.decode("utf-8").strip()
         if not current_branch:
             self.die(
                 f"Unable to retrieve ref for 'HEAD' in project "
                 f"{project.name!r}. It is possible the project has a tag or "
-                f"branch with the name 'HEAD'. If so, please delete it.")
-        if current_branch != 'HEAD':
+                f"branch with the name 'HEAD'. If so, please delete it."
+            )
+        if current_branch != "HEAD":
             if take_stats:
                 start = perf_counter()
             is_ancestor = project.is_ancestor_of(sha, current_branch)
             if take_stats:
-                stats['check if HEAD is ancestor of manifest-rev'] = \
+                stats["check if HEAD is ancestor of manifest-rev"] = (
                     perf_counter() - start
+                )
             try_rebase = self.args.rebase
         else:  # HEAD means no branch is checked out.
             # If no branch is checked out, 'rebase' and
@@ -1597,12 +1846,14 @@ class Update(_ProjectCommand):
     def project_is_active(self, project):
         return self.manifest.is_active(project, extra_filter=self.group_filter)
 
+
 class ForAll(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'forall',
-            'run a command in one or more local projects',
-            textwrap.dedent('''\
+            "forall",
+            "run a command in one or more local projects",
+            textwrap.dedent(
+                """\
             Runs a shell (on a Unix OS) or batch (on Windows) command
             within the repository of each of the specified PROJECTs.
 
@@ -1616,24 +1867,34 @@ class ForAll(_ProjectCommand):
             in long form:
 
                 west forall -c "ls -l" proj-1 proj-2
-            '''))
+            """
+            ),
+        )
 
     def do_add_parser(self, parser_adder):
-        parser = self._parser(parser_adder,
-                              epilog=ACTIVE_CLONED_PROJECTS_HELP)
-        parser.add_argument('-c', dest='subcommand', metavar='COMMAND',
-                            required=True)
-        parser.add_argument('-a', '--all', action='store_true',
-                            help='include inactive projects'),
-        parser.add_argument('-g', '--group', dest='groups',
-                            default=[], action='append',
-                            help='''only run COMMAND if a project is
+        parser = self._parser(parser_adder, epilog=ACTIVE_CLONED_PROJECTS_HELP)
+        parser.add_argument("-c", dest="subcommand", metavar="COMMAND", required=True)
+        parser.add_argument(
+            "-a", "--all", action="store_true", help="include inactive projects"
+        ),
+        parser.add_argument(
+            "-g",
+            "--group",
+            dest="groups",
+            default=[],
+            action="append",
+            help="""only run COMMAND if a project is
                             in this group; if given more than once,
                             the command will be run if the project is
-                            in any of the groups''')
-        parser.add_argument('projects', metavar='PROJECT', nargs='*',
-                            help='''projects (by name or path) to operate on;
-                            defaults to active cloned projects''')
+                            in any of the groups""",
+        )
+        parser.add_argument(
+            "projects",
+            metavar="PROJECT",
+            nargs="*",
+            help="""projects (by name or path) to operate on;
+                            defaults to active cloned projects""",
+        )
         return parser
 
     def do_run(self, args, user_args):
@@ -1642,15 +1903,16 @@ class ForAll(_ProjectCommand):
         for project in self._cloned_projects(args, only_active=not args.all):
             if group_set and not group_set.intersection(set(project.groups)):
                 continue
-            self.banner(
-                f'running "{args.subcommand}" in {project.name_and_path}:')
-            rc = subprocess.Popen(args.subcommand, shell=True,
-                                  cwd=project.abspath).wait()
+            self.banner(f'running "{args.subcommand}" in {project.name_and_path}:')
+            rc = subprocess.Popen(
+                args.subcommand, shell=True, cwd=project.abspath
+            ).wait()
             if rc:
                 failed.append(project)
         self._handle_failed(args, failed)
 
-GREP_EPILOG = '''
+
+GREP_EPILOG = """
 EXAMPLES
 --------
 
@@ -1747,9 +2009,10 @@ override this behavior on the command line, for example with:
 To do this permanently, set "grep.color":
 
   west config grep.color never
-'''
+"""
 # color.ui limitation:
 # https://github.com/zephyrproject-rtos/west/issues/651
+
 
 class Grep(_ProjectCommand):
 
@@ -1757,55 +2020,60 @@ class Grep(_ProjectCommand):
     #
     # - the 'failed' handling below for proper exit codes
     # - color handling works as expected
-    TOOLS = ['git-grep', 'ripgrep', 'grep']
+    TOOLS = ["git-grep", "ripgrep", "grep"]
 
-    DEFAULT_TOOL = 'git-grep'
+    DEFAULT_TOOL = "git-grep"
 
     DEFAULT_TOOL_ARGS = {
-        'git-grep': [],
-        'ripgrep': [],
-        'grep': ['--recursive'],
+        "git-grep": [],
+        "ripgrep": [],
+        "grep": ["--recursive"],
     }
 
     DEFAULT_TOOL_EXECUTABLES = {
         # git-grep is intentionally omitted: use self._git
-        'ripgrep': ['rg', 'ripgrep'],
-        'grep': ['grep'],
+        "ripgrep": ["rg", "ripgrep"],
+        "grep": ["grep"],
     }
 
     def __init__(self):
         super().__init__(
-            'grep',
-            'run grep or a grep-like tool in one or more local projects',
-            'Run grep or a grep-like tool in one or more local projects.',
-            accepts_unknown_args=True)
+            "grep",
+            "run grep or a grep-like tool in one or more local projects",
+            "Run grep or a grep-like tool in one or more local projects.",
+            accepts_unknown_args=True,
+        )
 
     def do_add_parser(self, parser_adder):
         parser = self._parser(parser_adder, epilog=GREP_EPILOG)
-        parser.add_argument('--tool', choices=self.TOOLS, help='grep tool')
-        parser.add_argument('--tool-path', help='path to grep tool executable')
+        parser.add_argument("--tool", choices=self.TOOLS, help="grep tool")
+        parser.add_argument("--tool-path", help="path to grep tool executable")
         # Unlike other project commands, we don't take the project as
         # a positional argument. This inconsistency makes the usual
         # use case of "search the entire workspace" faster to type.
-        parser.add_argument('-p', '--project', metavar='PROJECT',
-                            dest='projects', default=[], action='append',
-                            help='''project to run grep tool in (may be given
+        parser.add_argument(
+            "-p",
+            "--project",
+            metavar="PROJECT",
+            dest="projects",
+            default=[],
+            action="append",
+            help="""project to run grep tool in (may be given
                             more than once); default is all cloned active
-                            projects''')
+                            projects""",
+        )
         return parser
 
     def do_run(self, args, tool_cmdline_args):
         tool = self.tool(args)
-        command_list = ([self.tool_path(tool, args)] +
-                        self.tool_args(tool, tool_cmdline_args))
+        command_list = [self.tool_path(tool, args)] + self.tool_args(
+            tool, tool_cmdline_args
+        )
         failed = []
-        for project in self._cloned_projects(args,
-                                             only_active=not args.projects):
+        for project in self._cloned_projects(args, only_active=not args.projects):
             completed_process = self.run_subprocess(
-                command_list,
-                capture_output=True,
-                text=True,
-                cwd=project.abspath)
+                command_list, capture_output=True, text=True, cwd=project.abspath
+            )
 
             # By default, supported tools generally exit 1 if
             # nothing is found and 0 if something was found, with
@@ -1823,34 +2091,37 @@ class Grep(_ProjectCommand):
             # with a match, while ignoring errors.
             if completed_process.returncode == 1:
                 continue
-            self.banner(f'{project.name_and_path}:')
+            self.banner(f"{project.name_and_path}:")
             if completed_process.returncode != 0:
-                self.err(f'{util.quote_sh_list(command_list)}:\n'
-                         f'{completed_process.stderr}', end='')
+                self.err(
+                    f"{util.quote_sh_list(command_list)}:\n"
+                    f"{completed_process.stderr}",
+                    end="",
+                )
                 failed.append(project)
             elif completed_process.stdout:
                 # With 'west grep --quiet PATTERN', we will just be
                 # printing a list of repositories that contain
                 # matches. We want to avoid printing the newline from
                 # self.inf() in that case.
-                self.inf(completed_process.stdout, end='')
+                self.inf(completed_process.stdout, end="")
         self._handle_failed(args, failed)
 
     def tool(self, args):
         if args.tool:
             return args.tool
 
-        return self.config.get('grep.tool', self.DEFAULT_TOOL)
+        return self.config.get("grep.tool", self.DEFAULT_TOOL)
 
     def tool_path(self, tool, args):
         if args.tool_path:
             return args.tool_path
 
-        config_option = self.config.get(f'grep.{tool}-path')
+        config_option = self.config.get(f"grep.{tool}-path")
         if config_option:
             return config_option
 
-        if tool == 'git-grep':
+        if tool == "git-grep":
             self.die_if_no_git()
             return self._git
 
@@ -1864,44 +2135,50 @@ class Grep(_ProjectCommand):
     def tool_args(self, tool, cmdline_args):
         ret = []
 
-        if tool == 'git-grep':
-            ret.append('grep')
+        if tool == "git-grep":
+            ret.append("grep")
 
-        config_color = self.config.get('grep.color')
+        config_color = self.config.get("grep.color")
         if config_color:
             color = config_color
         else:
             if self.color_ui:
-                color = 'always'
+                color = "always"
             else:
-                color = 'never'
+                color = "never"
 
-        ret.extend([f'--color={color}'])
-        ret.extend(shlex.split(self.config.get(f'grep.{tool}-args', '')) or
-                   self.DEFAULT_TOOL_ARGS[tool])
+        ret.extend([f"--color={color}"])
+        ret.extend(
+            shlex.split(self.config.get(f"grep.{tool}-args", ""))
+            or self.DEFAULT_TOOL_ARGS[tool]
+        )
 
         # The first '--' we see is "meant for" west grep. Take that
         # out of the options we pass to the tool.
         found_first_dashes = False
         for arg in cmdline_args:
-            if arg == '--' and not found_first_dashes:
+            if arg == "--" and not found_first_dashes:
                 found_first_dashes = True
             else:
                 ret.append(arg)
 
         return ret
 
+
 class Topdir(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'topdir',
-            'print the top level directory of the workspace',
-            textwrap.dedent('''\
+            "topdir",
+            "print the top level directory of the workspace",
+            textwrap.dedent(
+                """\
             Prints the absolute path of the current west workspace's
             top directory.
 
             This is the directory containing .west. All project
-            paths in the manifest are relative to this top directory.'''))
+            paths in the manifest are relative to this top directory."""
+            ),
+        )
 
     def do_add_parser(self, parser_adder):
         return self._parser(parser_adder)
@@ -1909,12 +2186,14 @@ class Topdir(_ProjectCommand):
     def do_run(self, args, user_args):
         self.inf(PurePath(self.topdir).as_posix())
 
+
 class SelfUpdate(_ProjectCommand):
     def __init__(self):
         super().__init__(
-            'selfupdate',
-            'deprecated; exists for backwards compatibility',
-            'Do not use. You can upgrade west with pip only from v0.6.0.')
+            "selfupdate",
+            "deprecated; exists for backwards compatibility",
+            "Do not use. You can upgrade west with pip only from v0.6.0.",
+        )
 
     def do_add_parser(self, parser_adder):
         return self._parser(parser_adder)
@@ -2241,24 +2520,32 @@ class Sdk(_ProjectCommand):
 # Private helper routines.
 #
 
+
 def _clean_west_refspace(project):
     # Clean the refs/west space to ensure they do not show up in 'git log'.
 
     # Get all the ref names that start with refs/west/.
-    list_refs_cmd = ['for-each-ref', '--format=%(refname)', '--',
-                     QUAL_REFS + '**']
+    list_refs_cmd = ["for-each-ref", "--format=%(refname)", "--", QUAL_REFS + "**"]
     cp = project.git(list_refs_cmd, capture_stdout=True)
-    west_references = cp.stdout.decode('utf-8').strip()
+    west_references = cp.stdout.decode("utf-8").strip()
 
     # Safely delete each one.
     for ref in west_references.splitlines():
-        delete_ref_cmd = ['update-ref', '-d', ref]
+        delete_ref_cmd = ["update-ref", "-d", ref]
         project.git(delete_ref_cmd)
 
+
 def _update_manifest_rev(project, new_manifest_rev):
-    project.git(['update-ref',
-                 '-m', f'west update: moving to {new_manifest_rev}',
-                 QUAL_MANIFEST_REV, new_manifest_rev])
+    project.git(
+        [
+            "update-ref",
+            "-m",
+            f"west update: moving to {new_manifest_rev}",
+            QUAL_MANIFEST_REV,
+            new_manifest_rev,
+        ]
+    )
+
 
 def _maybe_sha(rev):
     # Return true if and only if the given revision might be a SHA.
@@ -2269,6 +2556,7 @@ def _maybe_sha(rev):
         return False
 
     return len(rev) <= 40
+
 
 def _rev_type(project, rev=None):
     # Returns a "refined" revision type of rev (default:
@@ -2288,19 +2576,24 @@ def _rev_type(project, rev=None):
     # update" specific logic.
     if not rev:
         rev = project.revision
-    cp = project.git(['cat-file', '-t', rev], check=False,
-                     capture_stdout=True, capture_stderr=True)
-    stdout = cp.stdout.decode('utf-8').strip()
+    cp = project.git(
+        ["cat-file", "-t", rev], check=False, capture_stdout=True, capture_stderr=True
+    )
+    stdout = cp.stdout.decode("utf-8").strip()
     if cp.returncode:
-        return 'other'
-    elif stdout in ('blob', 'tree', 'tag'):
+        return "other"
+    elif stdout in ("blob", "tree", "tag"):
         return stdout
-    elif stdout != 'commit':    # just future-proofing
-        return 'other'
+    elif stdout != "commit":  # just future-proofing
+        return "other"
 
     # to tell branches, lightweight tags, and commits apart, we need rev-parse.
-    cp = project.git(['rev-parse', '--verify', '--symbolic-full-name', rev],
-                     check=False, capture_stdout=True, capture_stderr=True)
+    cp = project.git(
+        ["rev-parse", "--verify", "--symbolic-full-name", rev],
+        check=False,
+        capture_stdout=True,
+        capture_stderr=True,
+    )
     if cp.returncode:
         # This can happen if the ref name is ambiguous, e.g.:
         #
@@ -2309,19 +2602,20 @@ def _rev_type(project, rev=None):
         #
         # Which creates both .git/ambiguous-ref and
         # .git/refs/heads/ambiguous-ref.
-        return 'other'
+        return "other"
 
-    stdout = cp.stdout.decode('utf-8').strip()
-    if stdout.startswith('refs/heads'):
-        return 'branch'
-    elif stdout.startswith('refs/tags'):
+    stdout = cp.stdout.decode("utf-8").strip()
+    if stdout.startswith("refs/heads"):
+        return "branch"
+    elif stdout.startswith("refs/tags"):
         # Annotated tags are handled above. Lightweight tags are
         # handled here.
-        return 'tag'
+        return "tag"
     elif not stdout:
-        return 'commit'
+        return "commit"
     else:
-        return 'other'
+        return "other"
+
 
 def _head_ok(project):
     # Returns True if the reference 'HEAD' exists and is not a tag or remote
@@ -2335,8 +2629,8 @@ def _head_ok(project):
     # will return:
     # - 0 if HEAD is present
     # - 1 otherwise
-    return project.git('show-ref --quiet --head /',
-                       check=False).returncode == 0
+    return project.git("show-ref --quiet --head /", check=False).returncode == 0
+
 
 def projects_unknown(manifest, projects):
     # Retrieve the projects with get_projects(project,
@@ -2348,11 +2642,12 @@ def projects_unknown(manifest, projects):
         return (manifest.get_projects(projects, only_cloned=False), None)
     except ValueError as ve:
         if len(ve.args) != 2:
-            raise          # not directly raised by get_projects()
+            raise  # not directly raised by get_projects()
         unknown = ve.args[0]
         if not unknown:
-            raise   # only_cloned is False, so this "can't happen"
+            raise  # only_cloned is False, so this "can't happen"
         return (None, unknown)
+
 
 #
 # Special files and directories in the west workspace.
@@ -2362,16 +2657,16 @@ def projects_unknown(manifest, projects):
 #
 
 # Top-level west directory, containing west itself and the manifest.
-WEST_DIR = '.west'
+WEST_DIR = ".west"
 
 # Default manifest repository URL.
-MANIFEST_URL_DEFAULT = 'https://github.com/zephyrproject-rtos/zephyr'
+MANIFEST_URL_DEFAULT = "https://github.com/zephyrproject-rtos/zephyr"
 
 #
 # Other shared globals.
 #
 
-ACTIVE_PROJECTS_HELP = '''\
+ACTIVE_PROJECTS_HELP = """\
 ACTIVE PROJECTS
 ---------------
 
@@ -2383,29 +2678,30 @@ Default output is limited to "active" projects as determined by the:
 To include inactive projects as well, use "--all" or give an explicit
 list of projects (by name or path). See the west documentation for
 more details on active projects.
-'''
+"""
 
-ACTIVE_CLONED_PROJECTS_HELP = f'''\
+ACTIVE_CLONED_PROJECTS_HELP = f"""\
 {ACTIVE_PROJECTS_HELP}
 
 Regardless of the above, output is limited to cloned projects.
-'''
+"""
 
 #
 # Helper class for creating format string keys that are expensive or
 # undesirable to compute if not needed.
 #
 
+
 class DelayFormat:
-    '''Delays formatting an object.'''
+    """Delays formatting an object."""
 
     def __init__(self, obj):
-        '''Delay formatting `obj` until a format operation using it.
+        """Delay formatting `obj` until a format operation using it.
 
         :param obj: object to format
 
         If callable(obj) returns True, then obj() will be used as the
-        string to be formatted. Otherwise, str(obj) is used.'''
+        string to be formatted. Otherwise, str(obj) is used."""
         self.obj = obj
         self.as_str = None
 
@@ -2416,7 +2712,8 @@ class DelayFormat:
                 assert isinstance(self.as_str, str)
             else:
                 self.as_str = str(self.obj)
-        return ('{:' + format_spec + '}').format(self.as_str)
+        return ("{:" + format_spec + "}").format(self.as_str)
+
 
 #
 # Logging helpers
@@ -2426,7 +2723,7 @@ class DelayFormat:
 class ProjectCommandLogFormatter(logging.Formatter):
 
     def __init__(self):
-        super().__init__(fmt='%(name)s: %(message)s')
+        super().__init__(fmt="%(name)s: %(message)s")
 
 
 class ProjectCommandLogHandler(logging.Handler):
